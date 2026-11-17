@@ -186,7 +186,7 @@ export default function ImageCarousel({
         fetchPriority={priority && k === 0 ? 'high' : undefined}
         decoding={k === 0 && !peek ? 'sync' : 'async'}
         draggable={false}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-contain p-2 bg-white"
         onError={onImgErr}
       />
       {renderOverlay && <div className="pointer-events-none absolute inset-0 z-[5]">{renderOverlay(i)}</div>}
@@ -217,7 +217,7 @@ export default function ImageCarousel({
   // DEFAULT — one full-width framed image at a time.
   return (
     <div className={className} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className={`relative  overflow-hidden border border-hair bg-surface ${aspectClass}`}>
+      <div className={`relative overflow-hidden rounded-[28px] border-[3px] border-ink bg-white shadow-[6px_6px_0_rgb(var(--gl-ink))] ${aspectClass}`}>
         <div
           ref={trackRef}
           onScroll={onScroll}

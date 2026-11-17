@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom';
  */
 
 const CSS = `
-.hb { position: relative; width: 100%; max-width: 2000px; margin: 0 auto; background: var(--gl-ink, #141414); }
+.hb { position: relative; width: 100%; max-width: 2000px; margin: 0 auto; background: var(--gl-ink, rgb(var(--gl-ink))); }
 .hb-track { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .hb-track::-webkit-scrollbar { display: none; }
 .hb-track:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
@@ -35,7 +35,7 @@ const CSS = `
 .hb-slide picture, .hb-single picture { display: block; width: 100%; height: 100%; }
 .hb-img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: contain; }
 /* Shown behind the picture until it has loaded (or if it never does): brand name on a soft shimmer, so a slow connection never looks like an empty black box. */
-.hb-ph { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; background: var(--gl-ink, #141414); color: rgba(239,234,224,.85); font-family: Archivo, Inter, sans-serif; font-weight: 800; letter-spacing: .14em; font-size: clamp(18px, 4vw, 40px); }
+.hb-ph { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; background: var(--gl-ink, rgb(var(--gl-ink))); color: rgba(239,234,224,.85); font-family: Archivo, Inter, sans-serif; font-weight: 800; letter-spacing: .14em; font-size: clamp(18px, 4vw, 40px); }
 .hb-ph::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.08) 50%, transparent 70%); transform: translateX(-100%); animation: hb-shimmer 1.6s infinite; }
 @keyframes hb-shimmer { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .hb-ph::after { animation: none; } }

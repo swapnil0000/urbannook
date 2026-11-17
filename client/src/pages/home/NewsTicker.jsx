@@ -160,7 +160,7 @@ const NewsTicker = () => {
   ];
 
   const renderText = (item, hidden) => {
-    const cls = `gl-lbl text-[9px] sm:text-[10px] tracking-[0.18em] ${item.festive ? 'text-star' : 'text-paper'}`;
+    const cls = `gl-lbl text-[9px] sm:text-[10px] tracking-[0.18em] ${item.festive ? 'text-star' : 'text-lime'}`;
     return (
       <MessageLink to={item.to} tabIndex={hidden ? -1 : undefined} className={item.to ? `${cls} hover:underline underline-offset-4 focus-visible:underline focus-visible:outline-none` : cls}>
         {item.text}
@@ -170,7 +170,7 @@ const NewsTicker = () => {
 
   return (
     <div className="block relative overflow-hidden group" role="region" aria-label="Announcements">
-      <div className={`bg-ink text-paper overflow-hidden relative py-2 sm:py-2.5 ${festive ? 'border-b border-star/30' : ''}`}>
+      <div className={`bg-forest text-lime overflow-hidden relative py-2 sm:py-2.5 ${festive ? 'border-b border-star/30' : ''}`}>
         <style>{`
           @keyframes marquee {
             0% { transform: translateX(0); }
@@ -201,7 +201,7 @@ const NewsTicker = () => {
                 {item.festive ? (
                   <span className="ml-6 sm:ml-8 text-star text-xs leading-none" aria-hidden="true">✦</span>
                 ) : (
-                  <i className="fa-solid fa-asterisk ml-6 sm:ml-8 text-brand text-xs leading-none" aria-hidden="true" />
+                  <i className="fa-solid fa-asterisk ml-6 sm:ml-8 text-mustard text-xs leading-none" aria-hidden="true" />
                 )}
               </div>
             )))}
@@ -209,8 +209,8 @@ const NewsTicker = () => {
         </div>
 
         {/* Gradient overlays for a smooth entry/exit against the ink band */}
-        <div className="absolute inset-y-0 left-0 w-12 sm:w-16 bg-gradient-to-r from-ink to-transparent z-10 pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-12 sm:w-16 bg-gradient-to-l from-ink to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 left-0 w-12 sm:w-16 bg-gradient-to-r from-forest to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-12 sm:w-16 bg-gradient-to-l from-forest to-transparent z-10 pointer-events-none" />
 
         {/* Pinned festive chip: the campaign countdown (server clock, admin end
             time) and, on collection/product pages, the admin's page line.

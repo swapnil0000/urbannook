@@ -118,8 +118,8 @@ export function ScrollColorBand({
   children,
   className = "",
   from = "#EFEAE0",   // Off-White / Paper — matches the page as the band enters
-  to = "#141414",     // Ink Black — fully black once the band fills the viewport
-  textFrom = "#141414",
+  to = "rgb(var(--gl-ink))",     // Ink Black - fully black once the band fills the viewport
+  textFrom = "rgb(var(--gl-ink))",
   textTo = "#EFEAE0",
   range = [0.05, 0.35],
   as = "div",

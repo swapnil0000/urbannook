@@ -99,20 +99,20 @@ const OrderConfirm = () => {
 
   // Guest user flow
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-surface">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-cream">
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-md text-center">
         <div className="bg-ink px-8 pt-10 pb-8 flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-4">
             <i className="fa-solid fa-circle-check text-3xl text-white"></i>
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-1">Order Confirmed!</h2>
+          <h2 className="text-2xl font-semibold text-white mb-1 font-anton uppercase leading-[.95]">Order Confirmed!</h2>
           <p className="text-brand text-sm">Thank you for shopping with Urban Nook.</p>
         </div>
 
         <div className="px-8 py-6 space-y-4">
           {payOnlineOffer && <PayOnlineOffer offer={payOnlineOffer} />}
           {isNewGuestAccount ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex gap-3">
+            <div className="bg-amber-50 border-[3px] border-amber-200 rounded-[24px] p-4 text-left flex gap-3 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
               <i className="fa-solid fa-envelope text-amber-500 mt-0.5 shrink-0"></i>
               <div>
                 <p className="text-sm font-semibold text-amber-900">Check your inbox</p>
@@ -126,10 +126,10 @@ const OrderConfirm = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-surface rounded-xl p-4 text-center">
-              <p className="text-sm text-gray-700 font-medium">Sign in to track your order</p>
+            <div className="bg-cream rounded-xl p-4 text-center">
+              <p className="text-sm text-ink font-medium">Sign in to track your order</p>
               {guestEmail && (
-                <p className="text-xs text-gray-500 mt-1">{guestEmail}</p>
+                <p className="text-xs text-ink/70 mt-1">{guestEmail}</p>
               )}
             </div>
           )}
@@ -146,7 +146,7 @@ const OrderConfirm = () => {
 
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-[11px] text-gray-400 uppercase tracking-widest">or</span>
+            <span className="text-[11px] text-ink/60 uppercase tracking-widest">or</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
@@ -163,7 +163,7 @@ const OrderConfirm = () => {
           </button>
 
           {isNewGuestAccount && (
-            <p className="text-[11px] text-gray-400 text-center">
+            <p className="text-[11px] text-ink/60 text-center">
               Didn&apos;t receive the email?{" "}
               <button
                 onClick={() => {
@@ -180,7 +180,7 @@ const OrderConfirm = () => {
 
           <button
             onClick={() => navigate("/products")}
-            className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
+            className="w-full py-3 border-[3px] border-ink text-ink/70 rounded-[24px] font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all shadow-[4px_4px_0_rgb(var(--gl-ink))]"
           >
             Continue Shopping
           </button>

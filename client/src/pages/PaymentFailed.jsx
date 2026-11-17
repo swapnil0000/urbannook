@@ -25,17 +25,17 @@ const PaymentFailed = () => {
   const copy = COPY[state?.reason] || COPY.failed;
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-surface">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-cream">
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-md text-center">
         <div className="bg-ink px-8 pt-10 pb-8 flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-4">
             <i className="fa-solid fa-circle-xmark text-3xl text-white"></i>
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-1">{copy.title}</h2>
+          <h2 className="text-2xl font-semibold text-white mb-1 font-anton uppercase leading-[.95]">{copy.title}</h2>
         </div>
 
         <div className="px-8 py-6 space-y-4">
-          <p className="text-sm text-gray-600">{copy.body}</p>
+          <p className="text-sm text-ink/70">{copy.body}</p>
 
           <button
             onClick={() => navigate("/checkout")}
@@ -48,7 +48,7 @@ const PaymentFailed = () => {
           {isAuthenticated && (
             <button
               onClick={() => navigate("/orders")}
-              className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
+              className="w-full py-3 border-[3px] border-ink text-ink/70 rounded-[24px] font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all shadow-[4px_4px_0_rgb(var(--gl-ink))]"
             >
               My Orders
             </button>
@@ -56,7 +56,7 @@ const PaymentFailed = () => {
 
           <button
             onClick={() => navigate("/contact-us")}
-            className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
+            className="w-full py-3 border-[3px] border-ink text-ink/70 rounded-[24px] font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all shadow-[4px_4px_0_rgb(var(--gl-ink))]"
           >
             Contact Support
           </button>

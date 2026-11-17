@@ -46,7 +46,7 @@ const OffersPage = () => {
   const goCheckout = () => navigate('/checkout');
 
   return (
-    <div className="font-inter bg-surface text-ink min-h-screen">
+    <div className="font-inter bg-cream text-ink min-h-screen">
       <SEOHead
         title="Offers & Combos"
         url="/offers"
@@ -55,23 +55,23 @@ const OffersPage = () => {
 
       <div className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-12">
         <p className="gl-lbl text-[11px] text-brand">{festive ? copy.eyebrow || 'Festive offers' : 'Live offers'}</p>
-        <h1 className="mt-1 text-4xl md:text-5xl font-extrabold tracking-tight">{festive ? copy.offersTitle || 'Offers' : 'Offers & Combos'}</h1>
-        <p className="text-muted mt-2 max-w-xl">Pick an offer, choose your designs, and checkout. The discount is applied for you, no code needed.</p>
+        <h1 className="mt-1 text-4xl md:text-5xl font-anton uppercase leading-[.95] text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">{festive ? copy.offersTitle || 'Offers' : 'Offers & Combos'}</h1>
+        <p className="text-ink/70 mt-2 max-w-xl">Pick an offer, choose your designs, and checkout. The discount is applied for you, no code needed.</p>
         {festive && <div className="mt-3"><FestiveCountdown tone="dark" /></div>}
       </div>
 
       <section className="max-w-[1280px] mx-auto px-5 py-8">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <p className="whitespace-nowrap text-xs text-muted sm:text-sm">{combos.length} {combos.length === 1 ? 'offer' : 'offers'} live</p>
+          <p className="whitespace-nowrap text-xs text-ink/70 sm:text-sm">{combos.length} {combos.length === 1 ? 'offer' : 'offers'} live</p>
           <SortMenu value={sort} options={OFFER_SORTS} onChange={setSort} />
         </div>
 
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse" />)}</div>
         ) : combos.length === 0 ? (
-          <div className="text-center py-20 border border-hair bg-white">
+          <div className="text-center py-20 border-[3px] border-ink bg-white shadow-[4px_4px_0_rgb(var(--gl-ink))]">
             <p className="font-extrabold text-lg">No combo offers right now</p>
-            <p className="text-muted mt-1 text-sm">Coupons below still apply at checkout.</p>
+            <p className="text-ink/70 mt-1 text-sm">Coupons below still apply at checkout.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">

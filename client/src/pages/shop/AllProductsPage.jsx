@@ -68,22 +68,22 @@ const AllProductsPage = () => {
     else setSearchParams({ category: c }, { replace: true });
   };
 
-  const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
+  const chip = (c) => `gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors ${activeCat === c ? 'bg-forest text-lime border-forest' : 'bg-white text-ink border-ink hover:bg-lime'}`;
 
   return (
-    <div className="font-inter bg-surface text-ink min-h-screen">
+    <div className="font-inter bg-cream text-ink min-h-screen overflow-x-clip">
       <SEOHead title="Shop All Products" url={activeCat === 'All' ? '/products' : categoryPath(activeCat)} description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
-      <div className="max-w-[1280px] mx-auto px-5 pt-10">
+      <div className="max-w-[1280px] mx-auto px-5 pt-6 md:pt-10">
         {/* same header shape as category pages (breadcrumb → title → line → pills),
             so switching between them doesn't jump the layout */}
-        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
+        <nav aria-label="Breadcrumb" className="text-sm text-ink/60 mb-4 pt-2">
           <Link to="/" className="hover:text-brand">Home</Link> / <span className="text-ink">Shop</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
         <SaleBanner className="mb-5" />
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
-        <p className="text-muted mt-2 truncate">Katanas, lamps &amp; décor. Made in India.</p>
+        <h1 className="font-anton uppercase text-brand text-[clamp(2.6rem,10vw,6rem)] leading-[.88] [text-shadow:3px_3px_0_rgb(var(--gl-ink))] break-words">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
+        <p className="text-ink/70 mt-3 truncate">Katanas, lamps &amp; décor. Made in India.</p>
 
         {/* One line, scrolled sideways - wrapping pushed the grid down a whole
             row on phones, and a category list is read across, not down.
@@ -113,21 +113,21 @@ const AllProductsPage = () => {
         {isLoading ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
         ) : error ? (
-          <div className="text-center py-28 border border-hair rounded-2xl bg-white">
-            <h2 className="text-2xl font-extrabold">Unable to load products</h2>
+          <div className="text-center py-28 rounded-[24px] border-[3px] border-ink bg-white">
+            <h2 className="font-anton uppercase text-3xl">Unable to load products</h2>
             <p className="text-muted mt-2">Please check your connection and try again.</p>
-            <button onClick={() => window.location.reload()} className="gl-press bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl mt-6 hover:bg-brandHi">Retry</button>
+            <button onClick={() => window.location.reload()} className="gl-press mt-6 inline-flex min-h-[52px] items-center px-7 rounded-full border-[3px] border-ink bg-brand text-white font-anton uppercase tracking-wide text-lg shadow-[4px_4px_0_rgb(var(--gl-ink))]">Retry</button>
           </div>
         ) : displayProducts.length === 0 ? (
-          <div className="text-center py-28 border border-hair rounded-2xl bg-white">
+          <div className="text-center py-28 rounded-[24px] border-[3px] border-ink bg-white">
             {chipProducts.length > 0 ? (
               <>
-                <h2 className="text-2xl font-extrabold">No products match these filters</h2>
+                <h2 className="font-anton uppercase text-3xl">No products match these filters</h2>
                 <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="mt-3 text-sm font-bold text-brand hover:underline">Clear filters</button>
               </>
             ) : (
               <>
-                <h2 className="text-2xl font-extrabold">Dropping soon</h2>
+                <h2 className="font-anton uppercase text-3xl">Dropping soon</h2>
                 <p className="text-muted mt-2">New pieces land here - check back Friday.</p>
               </>
             )}

@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+/* Home page - rebuilt 2026-11-16 from the ui-ux-pro-max design system
+   ("Feature-Rich Showcase" + "Ratings focused" patterns), keeping the
+   UrbanNook palette (Nook Red / Ink / Paper) and fonts (Archivo, Inter,
+   JetBrains Mono). Section order:
+     hero -> shop by category -> bestsellers -> why UrbanNook -> new arrivals
+     -> shop by series -> reviews + CTA -> make it yours -> FAQ
+   UX rules applied: one primary CTA per block, carousel with prev / next /
+   pause that stops on hover, focus and reduced motion, touch targets >= 44px,
+   text >= 11px, SVG icons (no emoji), visible focus rings. */
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../../store/slices/cartSlice';
@@ -7,256 +16,628 @@ import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
-import RangoliDivider from '../../component/festive/RangoliDivider';
-import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
-import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
+
+/* Pure-CSS motion (no JS animation library): items fade/slide in as they scroll
+   into view via a native scroll-driven animation (`animation-timeline: view()`).
+   Browsers without it, and reduced-motion users, simply see everything in place,
+   so content is always in the HTML and visible - nothing hidden from crawlers. */
+const Reveal = ({ children, className = '' }) => <div className={`un-rv ${className}`}>{children}</div>;
+const Stagger = ({ children, className = '' }) => <div className={className}>{children}</div>;
+const StaggerItem = ({ children, className = '' }) => <div className={`un-rv ${className}`}>{children}</div>;
+import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery, useGetCategoriesQuery } from '../../store/api/productsApi';
 import HeroBanner from '../../component/HeroBanner';
 import { useGetTestimonialsQuery, useGetGoogleReviewsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
-import { useGetPublicStatsQuery, ordersShown, shownCount, shownRating } from '../../store/api/statsApi';
+import { useGetPublicStatsQuery, shownCount, shownRating } from '../../store/api/statsApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
-import { sortByCategoryPriority } from '../../utils/categoryUrl';
+import { CATEGORY_LABEL } from '../../utils/categoryUrl';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
-
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
-const stars = (n) => { const r = Math.max(1, Math.min(5, n || 5)); return '★'.repeat(r) + '☆'.repeat(5 - r); };
+const REDUCE_MOTION = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2';
 
-const MARQUEE = ['3D-Printed', 'Made to Order', 'Pan-India Delivery', 'Car Culture', 'Desk Icons', 'Partial COD'];
+/* ── small SVG icon set (stroke icons, inherit currentColor) ── */
+const Icon = ({ name, className = 'w-5 h-5' }) => {
+  const p = {
+    arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+    left: <path d="M15 6l-6 6 6 6" />,
+    right: <path d="M9 6l6 6-6 6" />,
+    pause: <path d="M9 6v12M15 6v12" />,
+    play: <path d="M8 5l11 7-11 7z" />,
+    print: <><path d="M6 9V3h12v6" /><rect x="3" y="9" width="18" height="9" rx="1" /><path d="M7 18v3h10v-3" /></>,
+    truck: <><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7" /><circle cx="7" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></>,
+    wallet: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12h2M3 10h18" /></>,
+    shield: <><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></>,
+    star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" />,
+    plus: <path d="M12 5v14M5 12h14" />,
+    brush: <><path d="M14 4l6 6-8 8H6v-6z" /><path d="M12 6l6 6" /></>,
+  }[name];
+  return (
+    <svg viewBox="0 0 24 24" fill={name === 'star' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{p}</svg>
+  );
+};
 
-const Kicker = ({ children, className = '' }) => <p className={`gl-lbl text-brand ${className}`}>{children}</p>;
+const Stars = ({ n = 5, className = 'w-3.5 h-3.5' }) => (
+  <span className="inline-flex text-star" aria-label={`${n} out of 5 stars`}>
+    {[0, 1, 2, 3, 4].map((i) => <span key={i} className={i < Math.round(n) ? '' : 'opacity-25'}><Icon name="star" className={className} /></span>)}
+  </span>
+);
 
-/** Editorial section header with a ghosted index numeral + rising title. */
-const SecHead = ({ index, kicker, title, onView }) => (
-  <Reveal className="flex items-end justify-between gap-4 mb-8">
-    <div className="flex items-end gap-4 md:gap-5">
-      {/* {index && (
-        <span className="hidden sm:block font-archivo text-5xl md:text-7xl font-extrabold leading-[0.8] tabular-nums select-none -mb-1 text-ink/[0.08]">
-          {index}
-        </span>
-      )} */}
-      <div>
-        <Kicker className="mb-2">{kicker}</Kicker>
-        <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">{title}</h2>
-      </div>
+/** Tilted pill sticker with a hard ink shadow (CRAV / SweetTape labels). */
+const Sticker = ({ children, className = '', tone = 'bg-mustard text-ink' }) => (
+  <span className={`inline-block rounded-full border-[3px] border-ink px-3 py-1.5 md:px-4 font-anton uppercase leading-none shadow-[3px_3px_0_rgb(var(--gl-ink))] ${tone} ${className}`}>{children}</span>
+);
+const POP_BTN = `inline-flex items-center justify-center gap-2 min-h-[52px] px-7 rounded-full border-[3px] border-ink font-anton uppercase tracking-wide text-lg shadow-[4px_4px_0_rgb(var(--gl-ink))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow] ${FOCUS}`;
+
+/** Section header: tilted sticker kicker, giant Anton title, optional "View all". */
+const SecHead = ({ kicker, title, to, sub, tone = 'text-ink', sticker }) => (
+  <Reveal className="flex flex-wrap items-end justify-between gap-4 mb-8 md:mb-12">
+    <div>
+      {kicker && <Sticker tone={sticker || 'bg-mustard text-ink'} className="-rotate-6 text-sm md:text-lg mb-3">{kicker}</Sticker>}
+      <h2 className={`font-anton uppercase leading-[.85] text-[clamp(3rem,9vw,7rem)] ${tone}`}>{title}</h2>
+      {sub && <p className="text-sm md:text-base mt-3 max-w-xl opacity-80">{sub}</p>}
     </div>
-    {onView && (
-      <button onClick={onView} className="gl-lbl text-[11px] shrink-0 inline-flex items-center gap-1.5 border-b-2 border-current pb-0.5 hover:text-brand hover:border-brand transition-colors">
-        View all →
-      </button>
-    )}
+    {to && <Link to={to} className={`${POP_BTN} bg-cream text-ink`}>View all <Icon name="arrow" className="w-4 h-4" /></Link>}
   </Reveal>
 );
 
-/** Full-width kinetic marquee band (ink). */
-// const MarqueeBand = () => (
-//   <div className="bg-ink text-paper py-4 md:py-5 overflow-hidden border-y border-white/10">
-//     <div className="un-marquee">
-//       {[0, 1].map((dup) => (
-//         <div key={dup} className="flex items-center shrink-0" aria-hidden={dup === 1}>
-//           {MARQUEE.map((m, i) => (
-//             <span key={i} className="flex items-center">
-//               <span className="font-archivo text-xl md:text-3xl font-extrabold tracking-tight px-5 md:px-8 whitespace-nowrap">{m}</span>
-//               <span className="text-brand text-lg md:text-xl">✳</span>
-//             </span>
-//           ))}
-//         </div>
-//       ))}
-//     </div>
-//   </div>
-// );
+/* ══ HERO - "variant wheel" (after the Kumo matcha shot) ═════════════
+   One product on a centre stage; its designs sit on an arc around it as
+   tilted white tiles. Picking a design turns the whole arc so that design
+   slides into the centre, and the stage photo morphs in (scale + blur).
+   Auto-play walks through up to 6 designs of a product, then moves to the
+   next product. Stops on hover, keyboard focus, the pause button and
+   reduced motion. */
+const VARIANT_STEP_MS = 3200;
+const MAX_AUTO_DESIGNS = 6;
 
-/* The middle figure is live: paid orders from GET /stats/public, rounded down
-   to the hundred (ordersShown). It was typed in by hand and went stale
-   ("900+" with 1000+ orders). It used to read "0 - Mass produced", which
-   rendered as a large animated zero and looked like a number that had failed
-   to load. */
-const statsFor = (orders) => [
-  { to: 100, suffix: '%', label: 'Made in India' },
-  { to: ordersShown(orders), suffix: '+', label: 'Orders placed' },
-  { to: 48, suffix: 'h', label: 'To ship' },
-];
-
-/** Number that eases 0→value the first time it scrolls into view. */
-const CountUp = ({ to = 0, suffix = '', duration = 1.4 }) => {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, amount: 0.6 });
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setVal(to); return; }
-    let raf;
-    const start = performance.now();
-    const tick = (now) => {
-      const p = Math.min((now - start) / (duration * 1000), 1);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      setVal(Math.round(to * eased));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to, duration]);
-  return <span ref={ref}>{val}{suffix}</span>;
+const toFeature = (p) => {
+  const variants = (p?.variantDetails || []).filter((v) => (v.variantImage || []).some(Boolean));
+  const priced = variants.filter((v) => Number(v.variantPrice) > 0);
+  const cheapest = priced.length ? priced.reduce((a, v) => (Number(v.variantPrice) < Number(a.variantPrice) ? v : a)) : null;
+  const price = Number(cheapest?.variantPrice) || Number(firstVariant(p)?.variantPrice) || 0;
+  const mrp = Number(cheapest?.variantMrp) || 0;
+  const tiles = (variants.length ? variants : [{}]).map((v, k) => ({
+    key: v.sku || v.variantName || k,
+    img: (v.variantImage || []).find(Boolean) || productImg(p),
+    cut: ((v.variantImage || []).find(Boolean) || productImg(p)),
+    label: v.variantName || p?.productName,
+    sku: v.sku || v.variantName || '',
+    price: Number(v.variantPrice) || 0,
+  }));
+  return {
+    id: p?.productId,
+    name: p?.productName || 'UrbanNook',
+    category: p?.productCategory || '',
+    variantCount: variants.length,
+    price,
+    off: mrp > price && price > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0,
+    tiles,
+  };
 };
 
-/** Photo-led review card for the testimonial wall. */
-const ReviewCard = ({ t, img, tag, onClick }) => (
-  <figure
-    onClick={onClick}
-    className="group relative shrink-0 w-[288px] sm:w-[330px] aspect-[5/6] overflow-hidden bg-hair mr-4 md:mr-5 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-24px_rgba(20,20,20,0.55)]"
-  >
-    <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
-    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-    <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">{t.source === 'google' ? 'G · Google review' : '✓ Verified'}</span>
-    <figcaption className="absolute inset-x-3 bottom-3 p-4 bg-paper/95 backdrop-blur">
-      <div className="flex items-center gap-2.5 mb-2.5">
-        {t.photo
-          ? <img src={t.photo} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover shrink-0" />
-          : <span className="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-archivo font-extrabold text-sm shrink-0">{(t.userName || 'U').charAt(0).toUpperCase()}</span>}
-        <div className="min-w-0 flex-1">
-          <p className="gl-lbl text-[10px] text-ink truncate">{t.userName}</p>
-          <span className="text-star text-[11px] leading-none">{stars(t.rating)}</span>
-        </div>
-        <span className="gl-lbl text-[8px] text-brand shrink-0 max-w-[92px] truncate">{tag} →</span>
-      </div>
-      <p className="text-ink text-[13px] leading-snug line-clamp-3">“{t.content}”</p>
-    </figcaption>
-  </figure>
-);
 
-/** Slowly rotating circular-text stamp - an editorial accent to fill space. */
-const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => (
-  <div className="w-full h-full animate-[spin_16s_linear_infinite]">
-    <svg viewBox="0 0 120 120" className="w-full h-full">
-      <defs>
-        <path id="un-seal-path" d="M60,60 m-45,0 a45,45 0 1,1 90,0 a45,45 0 1,1 -90,0" fill="none" />
-      </defs>
-      <text fontSize="10.5" fontWeight="700" letterSpacing="1.6"
-        style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
-        fill="rgb(var(--gl-paper))" stroke="rgba(0,0,0,0.35)" strokeWidth="0.4">
-        <textPath href="#un-seal-path" startOffset="0">{text.toUpperCase()}</textPath>
-      </text>
-    </svg>
-  </div>
-);
+const Hero = ({ products, offers, rating, reviewCount, onOpen }) => {
+  const features = useMemo(() => {
+    const offerFor = new Map();
+    for (const o of offers) if (o?.primaryProductId && !offerFor.has(o.primaryProductId)) offerFor.set(o.primaryProductId, o);
+    const valid = products.filter((p) => p?.productId);
+    const best = (p) => ((p.tags || []).includes('best_seller') ? 0 : 1);
+    const many = (p) => ((p.variantDetails || []).length > 2 ? 0 : 1); // the wheel needs designs to show
+    const ordered = [...valid].sort((a, b) => (offerFor.has(b.productId) - offerFor.has(a.productId)) || (many(a) - many(b)) || (best(a) - best(b)));
+    // Only designs that have a transparent cut-out go on the wheel - a photo with its
+    // studio background would show up as a box. Products with none are skipped.
+    const all = ordered.map((p) => ({ ...toFeature(p), offer: offerFor.get(p.productId) || null }));
+    const cutOnly = all.map((x) => ({ ...x, tiles: x.tiles.filter((t) => t.cut) })).filter((x) => x.tiles.length);
+    return (cutOnly.length ? cutOnly : all).slice(0, 5);
+  }, [products, offers]);
 
-/** 3D curved coverflow carousel - ported from the reference: cards on a curved
- *  plane, center flat & forward, sides angled/blurred, auto-scrolls right→left,
- *  pauses on hover, click a card to focus it. Responsive (sizes scale to width). */
-const CoverflowCarousel = ({ images }) => {
-  const N = images.length;
-  const [active, setActive] = useState(Math.min(2, Math.max(N - 1, 0)));
-  const [paused, setPaused] = useState(false);
-  const stageRef = useRef(null);
-  const [stageW, setStageW] = useState(360);
+  const n = features.length;
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState({}); // chosen design per product
+  const [userPaused, setUserPaused] = useState(false);
+  const [hover, setHover] = useState(false);
+  const idx = n ? i % n : 0;
+  const f = features[idx];
+  const T = f?.tiles.length || 1;
+  const v = Math.min(picked[f?.id] || 0, T - 1);
+  const tile = f?.tiles[v];
+  const running = !userPaused && !hover && !REDUCE_MOTION && (n > 1 || T > 1);
 
   useEffect(() => {
-    const measure = () => { if (stageRef.current) setStageW(stageRef.current.offsetWidth); };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-  useEffect(() => {
-    if (N <= 1 || paused) return undefined;
-    const id = setInterval(() => setActive((a) => (a + 1) % N), 3000);
-    return () => clearInterval(id);
-  }, [N, paused]);
+    if (!running || !f) return undefined;
+    const id = setTimeout(() => {
+      if (v + 1 < Math.min(T, MAX_AUTO_DESIGNS)) setPicked((m) => ({ ...m, [f.id]: v + 1 }));
+      else if (n > 1) {
+        const next = features[(idx + 1) % n];
+        setPicked((m) => ({ ...m, [next.id]: 0 }));
+        setI((x) => (x + 1) % n);
+      } else setPicked((m) => ({ ...m, [f.id]: 0 }));
+    }, VARIANT_STEP_MS);
+    return () => clearTimeout(id);
+  }, [running, v, idx, T, n, f, features]);
 
-  const cardW = Math.min(stageW * 0.74, 380);
-  const cardH = cardW * 0.74;          // ~4:3, matches the reference 380×280
-  const shift = Math.min(stageW * 0.5, 280);
+  if (!f) return <section aria-label="Loading" className="bg-cream min-h-[640px] md:min-h-[calc(100vh-6.5rem)] animate-pulse" />;
 
+  const setV = (k) => setPicked((m) => ({ ...m, [f.id]: ((k % T) + T) % T }));
+  const go = (d) => setI((x) => (x + d + n) % n);
+  const open = (sku) => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onOpen(f.id, sku); };
+  const btn = `grid place-items-center w-11 h-11 rounded-full border-2 border-ink/80 bg-[#FFF6E8] text-ink hover:bg-ink hover:text-[#FFF6E8] transition-colors ${FOCUS}`;
+  const word = (CATEGORY_LABEL[f.category] || f.category || 'UrbanNook').toUpperCase();
+
+  /* Poster hero (2026-11-17, refs: CRAV burgers + SweetTape on landing.love):
+     cream field, giant condensed word behind a floating product cut-out,
+     tilted sticker badges, small copy blocks in the corners, red wave below. */
   return (
-    <div
-      ref={stageRef}
-      className="relative w-full flex items-center justify-center select-none"
-      style={{ perspective: '1500px', height: cardH + 56 }}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+    <section
+      aria-roledescription="carousel"
+      aria-label="Featured products"
+      className="relative bg-cream text-ink overflow-hidden"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHover(false); }}
     >
-      <div className="relative" style={{ transformStyle: 'preserve-3d', width: cardW, height: cardH }}>
-        {images.map((src, i) => {
-          let offset = i - active;
-          if (offset < -Math.floor(N / 2)) offset += N;
-          if (offset > Math.floor(N / 2)) offset -= N;
-          const abs = Math.abs(offset);
-          return (
-            <div
-              key={i}
-              onClick={() => setActive(i)}
-              className="absolute inset-0 overflow-hidden border border-white/10 shadow-2xl bg-ink cursor-pointer"
-              style={{
-                transform: `translateX(${offset * shift}px) translateZ(${-abs * 140}px) rotateY(${-offset * 15}deg) scale(${abs === 0 ? 1.05 : 1 - abs * 0.1})`,
-                opacity: abs === 0 ? 1 : abs === 1 ? 0.8 : 0.4,
-                filter: abs === 0 ? 'none' : 'blur(1px) brightness(0.85)',
-                zIndex: 10 - abs,
-                display: abs <= 2 ? 'block' : 'none',
-                transition: 'transform 0.7s cubic-bezier(0.25,1,0.5,1), opacity 0.7s ease, filter 0.7s ease',
-              }}
-            >
-              <img src={src} alt="" loading="lazy" className="w-full h-full object-cover pointer-events-none" onError={onImgErr} />
+      {/* paper grain */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[.35]" style={{ backgroundImage: 'radial-gradient(rgb(120 80 40 / .18) 1px, transparent 1px)', backgroundSize: '6px 6px' }} />
+
+      <div className="relative max-w-[1440px] mx-auto px-4 md:px-8 pt-6 md:pt-8 pb-6 md:pb-10">
+        {/* giant word -> product -> outlined brand word, stacked so nothing is hidden */}
+        <div className="relative flex flex-col items-center">
+          <p key={`w-${f.id}`} aria-hidden="true"
+            className="un-hero-in relative z-0 max-w-full whitespace-nowrap text-center font-anton uppercase leading-[.9] text-brand select-none text-[clamp(4rem,17vw,12.5rem)]">
+            {word}
+          </p>
+
+          <div className="relative z-10 mt-3 md:mt-4 w-full h-[280px] sm:h-[360px] md:h-[clamp(300px,calc(100svh-31rem),440px)]">
+            <button onClick={() => open(tile?.sku)} aria-label={`Open ${tile?.label}`}
+              className={`group absolute left-1/2 top-0 -translate-x-1/2 h-full ${tile?.cut ? 'w-[78vw] max-w-[360px] md:w-[min(40vw,520px)] md:max-w-none' : 'w-[min(62vw,280px)] sm:w-[320px] md:w-[min(30vw,400px)] rounded-[28px] overflow-hidden border-4 border-ink -rotate-3 shadow-[8px_8px_0_rgb(var(--gl-ink))] bg-white'} ${FOCUS}`}>
+              <img
+                key={tile?.cut || tile?.img}
+                src={tile?.cut || tile?.img}
+                alt={tile?.label || f.name}
+                fetchPriority={idx === 0 ? 'high' : undefined}
+                onError={onImgErr}
+                className={`un-pop absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-[1.04] ${tile?.cut ? 'un-cut object-contain' : 'object-contain p-2'}`}
+              />
+            </button>
+
+            {(f.offer || f.off > 0) && (
+              <Sticker className="absolute z-30 left-0 sm:left-[6%] md:left-[16%] top-[14%] -rotate-12 text-sm md:text-xl max-w-[42vw] md:max-w-[240px] !leading-tight text-center whitespace-normal">
+                {f.offer ? (f.offer.benefit || f.offer.title) : `${f.off}% off`}
+              </Sticker>
+            )}
+            <Sticker tone="bg-brand text-white" className="absolute z-30 right-0 sm:right-[6%] md:right-[16%] top-[62%] rotate-[10deg] text-sm md:text-xl">
+              {f.variantCount > 1 ? `${f.variantCount} designs` : 'Made to order'}
+            </Sticker>
+            <span aria-hidden="true" className="hidden lg:grid absolute right-[3%] top-[2%] z-30 place-items-center w-28 h-28 rounded-full bg-mustard border-[3px] border-ink text-ink">
+              <svg viewBox="0 0 120 120" className="un-spin absolute inset-0 w-full h-full">
+                <defs><path id="un-badge-path" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0" /></defs>
+                <text fontSize="11" fontWeight="800" letterSpacing="2.4" fill="currentColor" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  <textPath href="#un-badge-path">3D-PRINTED · 3D-PRINTED·</textPath>
+                </text>
+              </svg>
+              <Icon name="print" className="w-8 h-8" />
+            </span>
+          </div>
+
+          <p aria-hidden="true" className="relative z-20 mt-4 md:mt-5 font-anton uppercase leading-none text-[clamp(2.6rem,9vw,6.5rem)] text-mustard [-webkit-text-stroke:3px_rgb(var(--gl-ink))] md:[-webkit-text-stroke:4px_rgb(var(--gl-ink))] [text-shadow:5px_5px_0_rgb(var(--gl-ink))] select-none">
+            UrbanNook
+          </p>
+        </div>
+
+        {/* corner copy: name + rating left, price + buttons right */}
+        <div className="relative z-30 mt-4 md:mt-2 grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-end" aria-live={running ? 'off' : 'polite'}>
+          <div key={`c-${f.id}`} className="un-hero-in text-center md:text-left w-full max-w-sm mx-auto md:mx-0 min-w-0">
+            <p className="font-archivo font-extrabold text-lg md:text-xl leading-tight truncate h-[1.6rem] md:h-7">{f.name}</p>
+            <p className="mt-1 text-[13px] md:text-sm text-ink/75 truncate h-5">
+              {tile?.label && tile.label !== f.name ? <>{tile.label} · </> : null}
+              {rating ? <><b className="text-ink">{rating}★</b> from {reviewCount}+ reviews</> : '3D printed to order in India'}
+            </p>
+          </div>
+
+          {/* design switcher */}
+          <div className="flex items-center justify-center gap-2">
+            {T > 1 && <button onClick={() => setV(v - 1)} aria-label="Previous design" className={btn}><Icon name="left" className="w-4 h-4" /></button>}
+            {T > 1 && <span className="font-anton text-lg tabular-nums min-w-[3.5rem] text-center">{v + 1}/{T}</span>}
+            {T > 1 && <button onClick={() => setV(v + 1)} aria-label="Next design" className={btn}><Icon name="right" className="w-4 h-4" /></button>}
+          </div>
+
+          <div className="flex flex-wrap md:flex-nowrap items-center justify-center md:justify-end gap-3 whitespace-nowrap">
+            <span className="font-anton text-2xl md:text-[1.6rem] xl:text-3xl tabular-nums">{f.price > 0 ? `from ${inr(f.price)}` : ''}</span>
+            <button onClick={() => open(tile?.sku)} className={`gl-press inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-full border-[3px] border-ink bg-brand text-white font-anton uppercase tracking-wide text-lg shadow-[4px_4px_0_rgb(var(--gl-ink))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow] ${FOCUS}`}>
+              Shop this <Icon name="arrow" className="w-4 h-4" />
+            </button>
+            <Link to="/products" className={`inline-flex md:hidden xl:inline-flex items-center justify-center min-h-[48px] px-5 rounded-full border-[3px] border-ink font-anton uppercase tracking-wide text-lg hover:bg-ink hover:text-cream transition-colors ${FOCUS}`}>All</Link>
+          </div>
+        </div>
+
+        {/* product switcher */}
+        {n > 1 && (
+          <div className="mt-4 flex items-center justify-center gap-1">
+            <button onClick={() => go(-1)} aria-label="Previous product" className={btn}><Icon name="left" className="w-4 h-4" /></button>
+            <div className="flex items-center gap-0.5" role="tablist" aria-label="Choose featured product">
+              {features.map((x, di) => (
+                <button key={x.id || di} role="tab" aria-selected={di === idx} aria-label={`${di + 1} of ${n}: ${x.name}`} onClick={() => setI(di)} className={`h-11 px-1 grid place-items-center ${FOCUS}`}>
+                  <span className={`block h-2 rounded-full border-2 border-ink transition-all duration-300 ${di === idx ? 'w-8 bg-brand' : 'w-3 bg-transparent hover:bg-ink/30'}`} />
+                </button>
+              ))}
             </div>
-          );
-        })}
+            <button onClick={() => go(1)} aria-label="Next product" className={btn}><Icon name="right" className="w-4 h-4" /></button>
+            {!REDUCE_MOTION && (
+              <button onClick={() => setUserPaused((x) => !x)} aria-label={userPaused ? 'Play slideshow' : 'Pause slideshow'} className={btn}>
+                <Icon name={userPaused ? 'play' : 'pause'} className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes un-hero-in{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}.un-hero-in{animation:un-hero-in .6s cubic-bezier(.22,1,.36,1) both}@media (prefers-reduced-motion:reduce){.un-hero-in{animation:none}}`}</style>
+    </section>
+  );
+};
+
+/* ══ Page palette (2026-11-17, refs: CRAV burgers + SweetTape on landing.love).
+   Each block owns one flat colour; a drifting wave joins two neighbours. ══ */
+const COL = {
+  cream: ['bg-cream', 'fill-cream'],
+  lime: ['bg-lime', 'fill-lime'],
+  forest: ['bg-forest', 'fill-forest'],
+  mustard: ['bg-mustard', 'fill-mustard'],
+  red: ['bg-brand', 'fill-brand'],
+  paper: ['bg-paper', 'fill-paper'],
+  ink: ['bg-ink', 'fill-ink'],
+};
+const WRAP = 'max-w-[1280px] mx-auto px-5 md:px-8';
+/** Cream "sticker" frame every product card sits in. */
+const PopCard = ({ children, className = '' }) => <div className={`h-full ${className}`}>{children}</div>;
+
+/* ══ SHOP BY CATEGORY - lime field, tilted rounded tiles (SweetTape) ══ */
+const CategoryGrid = ({ tiles }) => (
+  <section className="un-crumple relative isolate text-forest">
+    <div className={`${WRAP} py-12 md:py-20`}>
+      <SecHead kicker="Find your corner" title={<>Shop by{' '}<br />category</>} tone="text-forest" sticker="bg-forest text-lime" />
+      <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-7">
+        {tiles.map((c, k) => (
+          <StaggerItem key={c.slug}>
+            <Link to={`/category/${c.slug}`}
+              className={`group relative block aspect-[4/5] rounded-[30px] border-[3px] border-ink bg-cream overflow-hidden shadow-[6px_6px_0_rgb(var(--gl-ink))] transition-transform duration-300 ${k % 2 ? 'rotate-2' : '-rotate-2'} hover:rotate-0 hover:-translate-y-1.5 motion-reduce:rotate-0 ${FOCUS}`}>
+              {c.cut
+                ? <img src={c.cut} alt="" loading="lazy" onError={onImgErr} className="un-cut absolute inset-x-0 top-6 bottom-24 m-auto w-[80%] h-[62%] object-contain transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6" />
+                : <img src={c.img} alt="" loading="lazy" onError={onImgErr} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />}
+              <span aria-hidden="true" className="absolute left-3 top-2 font-anton text-4xl md:text-6xl text-brand [-webkit-text-stroke:2px_rgb(var(--gl-ink))]">0{k + 1}</span>
+              <span className="absolute inset-x-2.5 bottom-2.5 rounded-[22px] bg-forest text-lime pl-4 pr-2 py-2.5 flex items-center justify-between gap-2">
+                <span className="min-w-0">
+                  <span className="block font-anton uppercase text-xl md:text-3xl leading-none truncate">{CATEGORY_LABEL[c.name] || c.name}</span>
+                  <span className="block text-[12px] md:text-[13px] text-cream/85 mt-1">{c.itemCount} {c.itemCount === 1 ? 'design' : 'designs'}</span>
+                </span>
+                <span aria-hidden="true" className="shrink-0 grid place-items-center w-10 h-10 rounded-full bg-lime text-forest transition-transform group-hover:rotate-[-45deg]"><Icon name="arrow" className="w-4 h-4" /></span>
+              </span>
+            </Link>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </div>
+  </section>
+);
+
+/* ══ BESTSELLERS - red "menu" board with a checker strip (CRAV) ══ */
+const Checker = () => <div aria-hidden="true" className="h-5 md:h-7" style={{ background: 'repeating-conic-gradient(rgb(var(--gl-cream)) 0 25%, transparent 0 50%) 0 0 / 28px 28px' }} />;
+const Bestsellers = ({ items, loading, total }) => (
+  <section className="text-cream">
+    <Checker />
+    <div className={`${WRAP} py-12 md:py-20`}>
+      <SecHead kicker="Most loved" title="Bestsellers" to="/products" tone="text-cream" />
+      {loading
+        ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[0, 1, 2, 3].map((i) => <div key={i} className="aspect-[4/5] bg-white/15 animate-pulse rounded-[26px]" />)}</div>
+        : (
+          <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {items.slice(0, 8).map((p, i) => <StaggerItem key={p.productId || i}><PopCard><HomeProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></PopCard></StaggerItem>)}
+          </Stagger>
+        )}
+      <div className="mt-10 flex justify-center"><Link to="/products" className={`${POP_BTN} bg-mustard text-ink`}>See all {total} pieces <Icon name="arrow" className="w-4 h-4" /></Link></div>
+    </div>
+    <Checker />
+  </section>
+);
+
+/* ══ WHY URBANNOOK - forest field, curved lime headline + numbered cards (SweetTape) ══ */
+const PROMISES = [
+  { icon: 'print', title: '3D-printed to order', body: 'Printed after you order - sharp detail, no warehouse stock.' },
+  { icon: 'truck', title: 'Dispatched in 48h', body: 'Pan-India delivery, 2-7 days depending on your pincode.' },
+  { icon: 'wallet', title: 'Partial COD', body: 'Pay a small advance online, the rest in cash on delivery.' },
+  { icon: 'shield', title: 'Free replacement', body: 'Arrived damaged or wrong? Report in 3 days, we replace it free.' },
+];
+const WhyUs = ({ orders }) => (
+  <section className="un-crumple relative isolate text-lime overflow-hidden">
+    <div className={`${WRAP} py-12 md:py-20`}>
+      <Reveal>
+        <h2 className="sr-only">Built when you order. Not before.</h2>
+        <svg viewBox="0 0 1200 250" className="w-full h-auto" aria-hidden="true">
+          <path id="un-arc" d="M 30 235 Q 600 -15 1170 235" fill="none" />
+          <text className="font-anton" fontSize="100" fill="currentColor" letterSpacing="1">
+            <textPath href="#un-arc" startOffset="50%" textAnchor="middle">BUILT WHEN YOU ORDER</textPath>
+          </text>
+        </svg>
+        <p aria-hidden="true" className="-mt-2 md:-mt-6 text-center font-anton uppercase text-cream text-[clamp(2.4rem,7vw,5.5rem)] leading-none">Not before.</p>
+      </Reveal>
+      <div className="mt-8 md:mt-12 flex flex-wrap justify-center gap-x-14 gap-y-4 text-center">
+        {orders > 0 && <div><p className="font-anton text-6xl md:text-8xl leading-none">{orders.toLocaleString('en-IN')}+</p><p className="text-cream/80 text-sm mt-1">orders delivered</p></div>}
+      </div>
+      <Stagger className="mt-10 md:mt-14 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+        {PROMISES.map((x, i) => (
+          <StaggerItem key={x.title} className="relative rounded-[28px] bg-cream text-forest p-4 md:p-6 pt-7 flex flex-col min-h-[220px] md:min-h-[270px]">
+            <span aria-hidden="true" className="absolute left-1/2 -translate-x-1/2 top-2.5 w-10 h-1.5 rounded-full bg-forest/25" />
+            <h3 className="font-anton uppercase text-xl md:text-3xl leading-[.95]">{x.title}</h3>
+            <p className="text-[13px] md:text-[15px] leading-relaxed mt-2 text-forest/80 flex-1">{x.body}</p>
+            <div className="mt-4 flex items-end justify-between">
+              <span className="font-anton text-5xl md:text-7xl leading-none">0{i + 1}</span>
+              <span className="grid place-items-center w-11 h-11 rounded-full bg-lime border-2 border-forest"><Icon name={x.icon} className="w-5 h-5" /></span>
+            </div>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </div>
+  </section>
+);
+
+/* ══ PRODUCT RAIL - horizontal on phones, arrows on desktop ══ */
+const ProductRail = ({ items, listId, listName }) => {
+  const ref = useRef(null);
+  const page = (d) => ref.current?.scrollBy({ left: d * ref.current.clientWidth * 0.9, behavior: REDUCE_MOTION ? 'auto' : 'smooth' });
+  if (items.length <= 4) {
+    return (
+      <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {items.map((p, i) => <StaggerItem key={p.productId || i}><PopCard className={i % 2 ? 'rotate-1' : '-rotate-1'}><HomeProductCard p={p} index={i} listId={listId} listName={listName} /></PopCard></StaggerItem>)}
+      </Stagger>
+    );
+  }
+  return (
+    <div className="relative">
+      <div ref={ref} className="flex gap-4 md:gap-6 overflow-x-auto gl-hscroll snap-x snap-mandatory pt-2 pb-4 -mx-5 px-5 md:mx-0 md:px-1">
+        {items.map((p, i) => (
+          <div key={p.productId || i} className="snap-start shrink-0 w-[62vw] sm:w-[260px] lg:w-[calc((100%-72px)/4)]">
+            <PopCard><HomeProductCard p={p} index={i} listId={listId} listName={listName} /></PopCard>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:flex justify-end gap-2 mt-4">
+        {[['left', -1, 'Scroll left'], ['right', 1, 'Scroll right']].map(([ic, d, label]) => (
+          <button key={ic} onClick={() => page(d)} aria-label={label} className={`grid place-items-center w-12 h-12 rounded-full border-[3px] border-ink bg-cream shadow-[3px_3px_0_rgb(var(--gl-ink))] hover:bg-ink hover:text-cream transition-colors ${FOCUS}`}>
+            <Icon name={ic} className="w-4 h-4" />
+          </button>
+        ))}
       </div>
     </div>
   );
 };
 
-const FAQS = [
-  { q: 'Can I customise my piece?', a: "Yes! Every product is 3D-printed to order, so we can tweak the colour or finish, add your initials or a logo, or tailor it to your setup. Just message us before you order and we'll make it yours." },
-  { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD - pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
-  { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it reaches you in 2-7 days depending on your pincode. Pan-India delivery on every order.' },
-  { q: 'Can I return it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." },
-  { q: 'What are the products made of?', a: 'Premium PLA + PETG with a signature 3D-printed layer texture and glossy resin detailing - sturdy, lightweight, and built to live on your desk for years.' },
-  { q: 'Do you do bulk orders or corporate gifting?', a: "Yes - we love custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll sort a quote for you." },
-];
-
-/** Accordion FAQ - one item open at a time, smooth height animation. */
-const FaqSection = ({ onContact }) => {
-  const [open, setOpen] = useState(0);
+/* ══ SHOP BY SERIES - sticker chips ══ */
+const SeriesStrip = ({ categories }) => {
+  const series = categories.filter((c) => c.kind !== 'category' && c.itemCount > 0).sort((a, b) => b.itemCount - a.itemCount).slice(0, 8);
+  if (series.length < 2) return null;
   return (
-    <section className="max-w-[860px] mx-auto px-5 py-5 md:py-20">
-      <Reveal className="text-center mb-8 md:mb-10">
-        <Kicker className="justify-center">Good to know</Kicker>
-        <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Questions? Answered.</h2>
-      </Reveal>
-      <div className="border-t border-hair">
-        {FAQS.map((f, i) => {
-          const isOpen = open === i;
-          return (
-            <div key={i} className="border-b border-hair">
-              <button onClick={() => setOpen(isOpen ? -1 : i)} className="w-full flex items-center justify-between gap-4 text-left py-5 group" aria-expanded={isOpen}>
-                <span className={`font-bold text-base md:text-lg transition-colors ${isOpen ? 'text-brand' : 'text-ink group-hover:text-brand'}`}>{f.q}</span>
-                <span className={`shrink-0 w-7 h-7 grid place-items-center border text-lg leading-none transition-all duration-300 ${isOpen ? 'bg-brand border-brand text-white rotate-45' : 'border-hair text-ink group-hover:border-ink'}`}>+</span>
-              </button>
-              <AnimatePresence initial={false}>
-                {isOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <p className="text-muted leading-relaxed pb-5 pr-8 md:pr-10 max-w-2xl">{f.a}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
-      </div>
-      <Reveal className="text-center mt-8">
-        <p className="text-muted text-sm">Still curious? <button onClick={onContact} className="text-brand font-bold underline underline-offset-2 hover:text-brandHi">Talk to us →</button></p>
+    <section className={`${WRAP} pb-12 md:pb-20`}>
+      <Reveal>
+        <h2 className="font-anton uppercase text-3xl md:text-5xl mb-5">Shop by series</h2>
+        <div className="flex flex-wrap gap-3">
+          {series.map((s, k) => (
+            <Link key={s.slug} to={`/category/${s.slug}`}
+              className={`inline-flex items-center gap-2 min-h-[48px] px-5 rounded-full border-[3px] border-ink bg-cream font-anton uppercase text-lg shadow-[3px_3px_0_rgb(var(--gl-ink))] ${k % 2 ? 'rotate-2' : '-rotate-2'} hover:rotate-0 hover:bg-brand hover:text-white transition ${FOCUS}`}>
+              {s.name}<span className="rounded-full bg-ink text-mustard text-xs px-2 py-0.5 font-inter font-bold">{s.itemCount}</span>
+            </Link>
+          ))}
+        </div>
       </Reveal>
     </section>
   );
 };
 
-/** Mobile-only sticky "add to cart" bar - slides up once you scroll past the hero,
- *  sits just above the bottom nav, hides near the footer. */
+/* ══ WAVE DIVIDER - a slowly drifting wave between two section colours.
+   The path holds two identical periods over 200% width, so sliding it by
+   -50% loops without a seam. ══ */
+const Wave = ({ bg, fill, flip = false }) => (
+  <div aria-hidden="true" className={`relative -my-px h-10 md:h-16 overflow-hidden ${bg} ${flip ? 'rotate-180' : ''}`}>
+    <svg className={`un-wave absolute bottom-0 left-0 h-full w-[200%] ${fill}`} viewBox="0 0 1440 60" preserveAspectRatio="none">
+      <path d="M0 30 C 120 0 240 0 360 30 S 600 60 720 30 S 960 0 1080 30 S 1320 60 1440 30 V60 H0 Z" />
+    </svg>
+  </div>
+);
+
+/* ══ PHOTO MARQUEE - tilted polaroids drifting right to left, pauses on hover / touch ══ */
+const PhotoMarquee = ({ products }) => {
+  const shots = useMemo(() => products.flatMap((p) => (p.variantDetails || []).slice(0, 2).map((v) => ({
+    img: (v.variantImage || []).find(Boolean), cut: ((v.variantImage || []).find(Boolean)), name: v.variantName || p.productName, id: p.productId, sku: v.sku || '',
+  }))).filter((x) => x.img).slice(0, 16), [products]);
+  // pause while a mouse is over it or a finger is on it (desktop + mobile), resume on leave/lift
+  const [hold, setHold] = useState(false);
+  if (shots.length < 6) return null;
+  const on = () => setHold(true);
+  const off = () => setHold(false);
+  return (
+    <section aria-label="Every design" className="pt-10 md:pt-16 pb-2">
+      <div className="un-marq-wrap overflow-hidden motion-reduce:overflow-x-auto py-4" data-hold={hold || undefined}
+        onPointerEnter={(e) => { if (e.pointerType === 'mouse') on(); }} onPointerLeave={off}
+        onPointerDown={on} onPointerUp={(e) => { if (e.pointerType !== 'mouse') off(); }} onPointerCancel={off}>
+        <div className="un-marq flex w-max gap-5 md:gap-7 px-3">
+          {[0, 1].map((dup) => shots.map((x, k) => (
+            <Link key={`${dup}-${k}`} to={x.sku ? `/product/${x.id}/${x.sku}` : `/products/${x.id}`} aria-hidden={dup === 1 || undefined} tabIndex={dup === 1 ? -1 : undefined}
+              className={`group shrink-0 w-40 md:w-56 rounded-[18px] border-[3px] border-ink bg-white p-2 pb-3 shadow-[5px_5px_0_rgb(var(--gl-ink))] ${k % 2 ? 'rotate-3' : '-rotate-3'} ${FOCUS}`}>
+              <span className="block aspect-square overflow-hidden rounded-[12px] bg-cream">
+                <img src={x.cut || x.img} alt={dup === 1 ? '' : x.name} loading="lazy" decoding="async" onError={onImgErr} className={`w-full h-full ${x.cut ? 'un-cut object-contain p-3' : 'object-cover'}`} />
+              </span>
+              <span className="block mt-2 font-anton uppercase text-sm md:text-base truncate text-ink">{x.name}</span>
+            </Link>
+          )))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+/* ══ NEW ARRIVALS - mustard field with a dashed flight path (CRAV) ══ */
+const Arrivals = ({ items }) => (
+  <section className={`relative ${WRAP} py-12 md:py-20`}>
+    <svg aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-6 w-full h-40 md:h-56 text-ink/35" viewBox="0 0 1200 200" preserveAspectRatio="none" fill="none">
+      <path d="M0 150 C 200 20 380 190 600 90 S 980 10 1200 120" stroke="currentColor" strokeWidth="3" strokeDasharray="14 12" strokeLinecap="round" />
+    </svg>
+    <div className="relative">
+      <Sticker tone="bg-brand text-white" className="hidden md:inline-block absolute right-[8%] top-0 rotate-[8deg] text-xl">Just dropped</Sticker>
+      <SecHead kicker="Fresh drop" title="New arrivals" to="/products" tone="text-brand [text-shadow:4px_4px_0_rgb(var(--gl-ink))]" sticker="bg-cream text-ink" />
+      <ProductRail items={items} listId="home_new" listName="New Arrivals" />
+    </div>
+  </section>
+);
+
+/* ══ REVIEWS - forest field, "news card" reviews with a big number (SweetTape) ══ */
+const ReviewSlider = ({ reviews, rating, total, google, products }) => {
+  const ref = useRef(null);
+  const page = (d) => ref.current?.scrollBy({ left: d * ref.current.clientWidth * 0.85, behavior: REDUCE_MOTION ? 'auto' : 'smooth' });
+  return (
+    <section className="un-crumple relative isolate text-lime">
+      <div className={`${WRAP} py-12 md:py-20`}>
+        <Reveal className="flex flex-wrap items-end justify-between gap-6 mb-8 md:mb-12">
+          <div>
+            <Sticker tone="bg-lime text-forest" className="-rotate-6 text-sm md:text-lg mb-3">{google?.rating ? 'Google reviews' : 'Customer reviews'}</Sticker>
+            <h2 className="font-anton uppercase leading-[.85] text-[clamp(3rem,9vw,7rem)]">Straight from{' '}<br />your desks</h2>
+            <p className="mt-4 flex items-center gap-2 text-cream"><Stars n={Number(rating) || 5} className="w-4 h-4" /><b>{rating}</b> · {total}+ reviews</p>
+          </div>
+          <div className="flex gap-2">
+            {[['left', -1, 'Previous reviews'], ['right', 1, 'Next reviews']].map(([ic, d, label]) => (
+              <button key={ic} onClick={() => page(d)} aria-label={label} className={`grid place-items-center w-12 h-12 rounded-full border-2 border-lime text-lime hover:bg-lime hover:text-forest transition-colors ${FOCUS}`}>
+                <Icon name={ic} className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
+        </Reveal>
+        <div ref={ref} className="flex gap-4 md:gap-5 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-2 -mx-5 px-5 md:mx-0 md:px-0">
+          {reviews.slice(0, 8).map((t, i) => {
+            const prod = products.length ? products[i % products.length] : null;
+            const cut = prod ? (productImg(prod)) : null;
+            return (
+              <figure key={i} className="relative snap-start shrink-0 w-[80vw] sm:w-[340px] rounded-[30px] bg-cream text-forest p-5 pt-7 flex flex-col">
+                <span aria-hidden="true" className="absolute left-1/2 -translate-x-1/2 top-2.5 w-10 h-1.5 rounded-full bg-forest/25" />
+                <blockquote className="font-archivo font-bold text-[15px] md:text-base leading-snug line-clamp-4">“{t.content}”</blockquote>
+                {prod && (
+                  <span className="mt-4 block h-40 rounded-[22px] overflow-hidden bg-white border-2 border-forest/15">
+                    <img src={cut || productImg(prod)} alt="" loading="lazy" onError={onImgErr} className={`w-full h-full object-contain ${cut ? 'un-cut p-3' : 'p-1'}`} />
+                  </span>
+                )}
+                <figcaption className="mt-4 flex items-end justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block font-bold text-sm truncate">{t.userName}</span>
+                    <span className="block text-xs text-forest/70 truncate">{t.source === 'google' ? 'Google review' : 'Verified buyer'}</span>
+                  </span>
+                  <span className="shrink-0 text-right leading-none">
+                    <span className="block font-anton text-5xl">{Number(t.rating || 5).toFixed(0)}<span className="text-2xl">/5</span></span>
+                    <Stars n={t.rating} className="w-3 h-3" />
+                  </span>
+                </figcaption>
+              </figure>
+            );
+          })}
+        </div>
+        {google?.mapsUrl && (
+          <a href={google.mapsUrl} target="_blank" rel="noopener noreferrer" className={`mt-6 inline-flex items-center gap-1.5 min-h-[44px] text-sm font-bold text-lime hover:text-cream ${FOCUS}`}>All reviews on Google <Icon name="arrow" className="w-4 h-4" /></a>
+        )}
+      </div>
+    </section>
+  );
+};
+
+/* ══ MAKE IT YOURS - big red headline left, tilted photo right (CRAV "Feel the change") ══ */
+const ClosingBand = ({ products }) => {
+  const p = products.find((x) => (productImg(x))) || products[0];
+  const cut = p ? (productImg(p)) : null;
+  return (
+    <section className={`${WRAP} py-12 md:py-20 grid md:grid-cols-2 gap-10 md:gap-14 items-center`}>
+      <Reveal>
+        <Sticker tone="bg-brand text-white" className="-rotate-6 text-sm md:text-lg">Customization</Sticker>
+        <h2 className="mt-4 font-anton uppercase text-brand leading-[.85] text-[clamp(3.6rem,10vw,8.5rem)]">Make it{' '}<br />yours.</h2>
+        <p className="mt-5 text-ink/80 text-base md:text-lg max-w-md">Every piece is printed after you order - a different colour, your name on it or a design we don&apos;t stock is a normal ask. Tell us, and we&apos;ll reply with what&apos;s possible and what it costs.</p>
+        <div className="mt-7 flex flex-wrap gap-3">
+          <Link to="/customize" className={`${POP_BTN} bg-brand text-white`}><Icon name="brush" className="w-5 h-5" /> Customize a piece</Link>
+          <Link to="/products" className={`${POP_BTN} bg-cream text-ink`}>Shop all</Link>
+        </div>
+      </Reveal>
+      {p && (
+        <Reveal className="relative">
+          <div className="relative aspect-square rounded-[36px] border-4 border-ink bg-mustard overflow-hidden rotate-2 shadow-[10px_10px_0_rgb(var(--gl-ink))]">
+            <img src={cut || productImg(p)} alt={p.productName} loading="lazy" onError={onImgErr} className={`w-full h-full ${cut ? 'un-cut un-bob object-contain p-10' : 'object-cover'}`} />
+          </div>
+          <Sticker className="absolute -left-2 md:-left-6 bottom-10 -rotate-12 text-lg md:text-2xl">Your name here?</Sticker>
+          <Sticker tone="bg-lime text-forest" className="absolute -right-1 md:-right-4 top-8 rotate-12 text-base md:text-xl">Any colour</Sticker>
+        </Reveal>
+      )}
+    </section>
+  );
+};
+
+/* ══ FAQ ══ */
+const FAQS = [
+  { q: 'Can I customise my piece?', a: "Yes. Every product is 3D-printed to order, so we can change the colour or finish, add your initials or a logo, or tailor it to your setup. Message us before you order and we'll make it yours." },
+  { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD - pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
+  { q: 'How long will my order take?', a: 'Each piece is printed after you order and dispatched within 48 hours. It reaches you in 2-7 days depending on your pincode, anywhere in India.' },
+  { q: 'Can I return it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." },
+  { q: 'What are the products made of?', a: 'Premium PLA + PETG with a 3D-printed layer texture and glossy resin detailing - sturdy, lightweight and built to last.' },
+  { q: 'Do you do bulk orders or corporate gifting?', a: "Yes - custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll send a quote." },
+];
+// FAQ answers as schema.org FAQPage, from the same list the page shows.
+const FAQ_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+};
+const Faq = () => {
+  const [open, setOpen] = useState(0);
+  return (
+    <section className="max-w-[900px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <Reveal className="mb-8 md:mb-10 text-center">
+        <h2 className="font-anton uppercase leading-[.85] text-[clamp(3rem,9vw,6.5rem)] text-transparent [-webkit-text-stroke:2px_rgb(var(--gl-ink))] md:[-webkit-text-stroke:3px_rgb(var(--gl-ink))]">Questions?</h2>
+        <p className="font-anton uppercase text-brand text-2xl md:text-4xl -mt-1">Answered.</p>
+      </Reveal>
+      <div className="flex flex-col gap-3">
+        {FAQS.map((f, i) => {
+          const isOpen = open === i;
+          return (
+            <div key={f.q} className={`rounded-[22px] border-[3px] border-ink transition-colors ${isOpen ? 'bg-lime shadow-[5px_5px_0_rgb(var(--gl-ink))]' : 'bg-white'}`}>
+              <h3>
+                <button id={`faq-q-${i}`} onClick={() => setOpen(isOpen ? -1 : i)} aria-expanded={isOpen} aria-controls={`faq-a-${i}`}
+                  className={`w-full flex items-center justify-between gap-4 text-left px-5 py-4 min-h-[60px] rounded-[20px] ${FOCUS}`}>
+                  <span className="font-archivo font-extrabold text-base md:text-lg text-ink">{f.q}</span>
+                  <span className={`shrink-0 grid place-items-center w-10 h-10 rounded-full border-2 border-ink transition-transform duration-300 ${isOpen ? 'bg-ink text-lime rotate-45' : 'bg-mustard text-ink'}`}>
+                    <Icon name="plus" className="w-4 h-4" />
+                  </span>
+                </button>
+              </h3>
+              <div id={`faq-a-${i}`} role="region" aria-labelledby={`faq-q-${i}`} aria-hidden={!isOpen}
+                className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                <div className="overflow-hidden">
+                  <p className="text-ink/80 text-[15px] md:text-base leading-relaxed px-5 pb-5 pr-14 max-w-2xl">{f.a}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-8 text-center text-ink/80 text-[15px]">Still curious? <Link to="/contact-us" className={`text-brand font-bold underline underline-offset-4 hover:text-brandHi ${FOCUS}`}>Talk to us</Link></p>
+    </section>
+  );
+};
+
+/* ══ BIG SIGN-OFF - giant outlined brand word with pieces resting on it (CRAV footer) ══ */
+const BigSign = ({ products }) => {
+  const cuts = products.map((p) => (productImg(p))).filter(Boolean).slice(0, 2);
+  return (
+    <section aria-hidden="true" className="relative overflow-hidden pt-10 md:pt-16 pb-6 select-none">
+      <p className="text-center font-anton uppercase leading-[.8] text-brand text-[clamp(3.6rem,16.5vw,15.5rem)] [-webkit-text-stroke:3px_rgb(var(--gl-ink))] md:[-webkit-text-stroke:6px_rgb(var(--gl-ink))] [text-shadow:6px_6px_0_rgb(var(--gl-ink))] md:[text-shadow:12px_12px_0_rgb(var(--gl-ink))]">UrbanNook</p>
+    </section>
+  );
+};
+
+/** Mobile-only sticky add-to-cart for the lead product, above the bottom nav. */
 const StickyAddBar = ({ product, onAdd }) => {
   const [show, setShow] = useState(false);
   const [added, setAdded] = useState(false);
@@ -270,874 +651,122 @@ const StickyAddBar = ({ product, onAdd }) => {
   const v = firstVariant(product);
   const handle = () => { onAdd(); setAdded(true); setTimeout(() => setAdded(false), 1600); };
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          data-sticky-buybar // the floating Help button lifts above this bar while it is shown
-          className="md:hidden fixed left-0 right-0 z-30 px-3"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}
-        >
-          <div className="flex items-center gap-3 bg-ink text-paper border border-white/10 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] p-2">
-            <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
+        <div data-sticky-buybar aria-hidden={!show} inert={!show || undefined}
+          className={`md:hidden fixed left-0 right-0 z-30 px-3 transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none ${show ? 'translate-y-0 opacity-100' : 'translate-y-[120%] opacity-0 pointer-events-none'}`} style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}>
+          <div className="flex items-center gap-3 bg-ink text-paper border border-white/10 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] p-2 rounded-lg">
+            <img src={(productImg(product)) || productImg(product)} alt="" className={`w-12 h-12 shrink-0 ${(productImg(product)) ? 'object-contain' : 'object-cover rounded bg-white/10'}`} onError={onImgErr} />
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
-              {/* price + real struck MRP / % off from the variant - no shipping claim (that depends on the live offer) */}
-              <p className="text-[11px] text-paper/60 leading-tight">
+              <p className="text-[13px] font-bold truncate leading-tight">{product.productName}</p>
+              <p className="text-xs text-paper/70 leading-tight mt-0.5">
                 <b className="text-paper">{inr(v.variantPrice)}</b>
-                {Number(v.variantMrp) > Number(v.variantPrice) && (
-                  <> <s>{inr(v.variantMrp)}</s> · <span className="font-bold text-star">{Math.round((1 - v.variantPrice / v.variantMrp) * 100)}% OFF</span></>
-                )}
+                {Number(v.variantMrp) > Number(v.variantPrice) && <> <s>{inr(v.variantMrp)}</s></>}
               </p>
             </div>
-            <button onClick={handle} className={`un-btn gl-press shrink-0 font-bold text-xs px-5 py-3 ${added ? 'bg-save text-white' : 'bg-brand text-white'}`}>
-              {!added && <span className="un-fill bg-brandHi"></span>}
-              {added ? '✓ Added' : 'Add'}
-            </button>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
-/** Refer & Save teaser - shares the brand (Web Share API, falls back to copy link). */
-const ReferSave = () => {
-  const [copied, setCopied] = useState(false);
-  const share = async () => {
-    const url = 'https://www.urbannook.in';
-    const text = 'Check out UrbanNook - 3D-printed desk lamps & décor, made to order in India.';
-    try {
-      if (navigator.share) await navigator.share({ title: 'UrbanNook', text, url });
-      else { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    } catch { /* user dismissed the share sheet */ }
-  };
-  return (
-    <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-14">
-      <Reveal className="relative overflow-hidden bg-ink text-paper border border-white/10 p-8 md:p-14 text-center md:text-left">
-        <span aria-hidden="true" className="pointer-events-none select-none absolute -right-2 -bottom-10 md:-bottom-16 font-archivo text-[8rem] md:text-[14rem] font-extrabold text-white/[0.05] leading-none">₹</span>
-        <div className="relative md:flex md:items-center md:justify-between gap-8">
-          <div className="max-w-xl md:mx-0 mx-auto">
-            <p className="gl-lbl text-brand mb-3">Refer &amp; Save</p>
-            <h3 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">Know someone whose<br className="hidden md:block" /> desk needs this?</h3>
-            <p className="text-paper/70 mt-4 max-w-md md:mx-0 mx-auto">Share UrbanNook with a friend. Our referral rewards are launching soon - share now and you&apos;ll be first in line to earn.</p>
-          </div>
-          <button onClick={share} className="un-btn gl-press mt-6 md:mt-0 shrink-0 bg-brand text-white font-bold text-sm px-8 py-4 inline-flex items-center gap-2">
-            <span className="un-fill bg-brandHi"></span>
-            <i className="fa-solid fa-share-nodes" /> {copied ? 'Link copied ✓' : 'Share UrbanNook'}
-          </button>
-        </div>
-      </Reveal>
-    </section>
-  );
-};
-
-/* ══ HERO - "THE DROP" ══════════════════════════════════════════════════
-   Catalogue-forward on a dark stage. Two things share the first screen:
-   a featured piece with its headline, and a rail of the ENTIRE catalogue
-   underneath it - so nothing above the fold is empty, which was the whole
-   problem with a tall editorial banner on this shop.
-
-   Why the pieces sit in light tiles rather than floating on the dark:
-   every product here is photographed as a cut-out on a light studio grey.
-   On a dark page there is no blend mode that removes that grey - screen
-   and lighten make it glow, multiply crushes it to black. So the frame is
-   made deliberate: a lit tile on a dark wall, which is how drop stores
-   present product anyway, and multiply inside the tile then dissolves the
-   grey into it completely.
-
-   The featured tile still scan-prints on each rotation - the one motion
-   carried over from the build-plate idea, now at tile scale where it costs
-   no empty space.
-   ═══════════════════════════════════════════════════════════════════ */
-
-const HERO_ROTATE_MS = 6000;
-
-const REDUCE_MOTION =
-  typeof window !== 'undefined' &&
-  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-/** What the featured slot needs from one product. */
-const toFeature = (p) => {
-  const variants = (p?.variantDetails || []).filter(
-    (v) => (v.variantImage || []).filter(Boolean).length > 0,
-  );
-  const priced = variants.filter((v) => Number(v.variantPrice) > 0);
-  const cheapest = priced.length
-    ? priced.reduce((a, v) => (Number(v.variantPrice) < Number(a.variantPrice) ? v : a))
-    : null;
-  const price = Number(cheapest?.variantPrice) || Number(firstVariant(p)?.variantPrice) || 0;
-  const mrp = Number(cheapest?.variantMrp) || 0;
-  /* What the carousel rides on. With several variants it is one tile per
-     variant - BMW / Porsche / Lamborghini / Ferrari, or the eleven katana
-     designs. With a single variant there is nothing to compare, so it falls
-     back to that variant's own gallery: either way the rail is never one
-     lone tile sitting in a wide gap. */
-  const tiles = variants.length > 1
-    ? variants.map((v, k) => ({
-        key: v.sku || v.variantName || k,
-        img: (v.variantImage || []).filter(Boolean)[0],
-        label: v.variantName || p?.productName,
-        sku: v.sku || v.variantName,
-      }))
-    : (variants[0]?.variantImage || []).filter(Boolean).map((img, k) => ({
-        key: `${variants[0]?.sku || 'v'}-${k}`,
-        img,
-        label: variants[0]?.variantName || p?.productName,
-        sku: variants[0]?.sku || variants[0]?.variantName,
-      }));
-
-  return {
-    id: p?.productId,
-    name: p?.productName || 'UrbanNook',
-    category: p?.productCategory || '',
-    variantName: cheapest?.variantName || '',
-    variantCount: variants.length,
-    price,
-    off: mrp > price && price > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0,
-    tiles: tiles.filter((t) => t.img).length ? tiles.filter((t) => t.img) : [{ key: 'fallback', img: productImg(p), label: p?.productName, sku: '' }],
-  };
-};
-
-const HeroCarousel = ({ products = [], offers = [], onVariant, onShop }) => {
-  // The first few products take turns in the featured slot; the rail below
-  // carries the whole catalogue regardless. Products with a live offer
-  // (GET /promotions/display/home) lead the rotation and carry that offer,
-  // so the first screen sells the deal, not just the product.
-  const features = useMemo(() => {
-    const offerFor = new Map();
-    for (const o of offers) if (o?.primaryProductId && !offerFor.has(o.primaryProductId)) offerFor.set(o.primaryProductId, o);
-    const valid = products.filter((p) => p?.productId);
-    const withOffer = valid.filter((p) => offerFor.has(p.productId));
-    const rest = valid.filter((p) => !offerFor.has(p.productId));
-    return [...withOffer, ...rest].slice(0, Math.max(4, withOffer.length))
-      .map((p) => ({ ...toFeature(p), offer: offerFor.get(p.productId) || null }));
-  }, [products, offers]);
-
-  /* The rotation above already covers the first few products, so the strip
-     below carries the remainder. On a catalogue too small to have a remainder
-     it falls back to everything, rather than rendering an empty row. */
-  const strip = useMemo(() => {
-    const shown = new Set(features.map((x) => x.id));
-    const rest = products.filter((p) => p?.productId && !shown.has(p.productId));
-    return rest.length ? { items: rest, isRest: true } : { items: products, isRest: false };
-  }, [products, features]);
-
-  const n = features.length;
-  const [i, setI] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const idx = n ? i % n : 0;
-  const f = features[idx];
-
-  useEffect(() => {
-    if (paused || REDUCE_MOTION || n <= 1) return undefined;
-    const id = setInterval(() => setI((x) => (x + 1) % n), HERO_ROTATE_MS);
-    return () => clearInterval(id);
-  }, [paused, n]);
-
-  const go = (d) => setI((x) => (x + d + n) % n);
-
-  const railRef = useRef(null);
-  // "More to explore" row: arrows page it by what's on screen (5 cards on desktop).
-  const stripRef = useRef(null);
-  const pageStrip = (d) => {
-    const el = stripRef.current;
-    if (el) el.scrollBy({ left: d * el.clientWidth, behavior: 'smooth' });
-  };
-  const scrollRail = (d) => {
-    const el = railRef.current;
-    if (!el) return;
-    // roughly one tile per tap, whatever that tile's natural width turned out to be
-    const step = el.firstElementChild?.getBoundingClientRect().width || el.clientWidth * 0.6;
-    el.scrollBy({ left: d * (step + 16), behavior: 'smooth' });
-  };
-
-  // A new featured product means a new set of variants - start at the front.
-  useEffect(() => { railRef.current?.scrollTo({ left: 0 }); }, [idx]);
-
-  // The row's list changes once offers load (offer products move up into the
-  // rotation). Scroll-snap then keeps the card it had snapped to in view - now
-  // the 2nd one - so the row opened one card in, the first cut off. Start over.
-  const stripKey = strip.items.map((p) => p.productId).join(',');
-  useEffect(() => { stripRef.current?.scrollTo({ left: 0 }); }, [stripKey]);
-
-  if (!f) return <section className="bg-ink min-h-[calc(100svh-6.25rem)] animate-pulse" />;
-
-  return (
-    <section className="relative bg-ink text-paper overflow-hidden">
-      <style>{`
-        @keyframes un-in { from { opacity: 0; } to { opacity: 1; } }
-        .un-in { animation: un-in 420ms ease-out both; }
-        @media (prefers-reduced-motion: reduce) {
-          .un-in { animation: none; }
-        }
-      `}</style>
-
-      {/* ambient: one red wash + a faint rule grid, nothing that eats space */}
-      <div className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(55% 45% at 68% 38%, rgb(var(--gl-brand) / 0.20), transparent 70%)' }} />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage: 'linear-gradient(to right, rgba(255,255,255,.6) 1px, transparent 1px)',
-          backgroundSize: '12.5% 100%',
-        }} />
-
-      <div
-        className="relative flex flex-col md:min-h-[calc(100vh-6.5rem)]"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        {/* ── TOP: the featured piece ── */}
-        <div className="flex-1 flex flex-col md:flex-row items-center gap-5 md:gap-10 px-4 sm:px-5 md:px-10 pt-5 md:pt-10">
-          {/* copy — only the product's own rows (tag, name, price) are keyed
-              and fade on a change; Shop all, the trust row and the dots /
-              arrows stay mounted, so they don't blink every rotation. */}
-          <div className="order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
-            {/* Every row below keeps a fixed height, so swapping the featured
-                product (every 6 s) never moves the page: offer tag or label
-                share one slot, the name always reserves its lines, price and
-                trust rows stay single-line. */}
-            <div key={`t-${f.id}`} className="un-in">
-            <div className="mb-2 md:mb-3 flex h-7 items-center">
-              {f.offer ? (
-                <p className="inline-flex max-w-full items-center gap-2 bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
-                  <i className={`fa-solid ${f.offer.mysteryGift || f.offer.freeGift ? 'fa-gift' : 'fa-tag'} text-[10px]`} aria-hidden="true" />
-                  <span className="truncate">Offer · {f.offer.benefit || f.offer.title}</span>
-                </p>
-              ) : (
-                <p className="gl-lbl text-brand">
-                  Drop {String(idx + 1).padStart(2, '0')} · Made to order
-                </p>
-              )}
-            </div>
-            {/* The rotating featured product is a heading of its own, not the page's H1:
-                the H1 (below, visually hidden) says what the whole store is. */}
-            {/* fixed 2-line (desktop 3-line) slot; a shorter name sits on its
-                floor, next to the price, and the spare room goes above it */}
-            <div className="flex items-end font-archivo text-[1.65rem] sm:text-5xl lg:text-6xl leading-[1.02] md:leading-[0.95] min-h-[2.04em] md:min-h-[2.85em]">
-              <h2 className="font-extrabold tracking-tight break-words line-clamp-2 md:line-clamp-3">
-                {f.name}
-              </h2>
-            </div>
-
-            <div className="mt-2 md:mt-4 flex h-6 items-center gap-x-3 overflow-hidden whitespace-nowrap">
-              {f.variantCount > 1 && (
-                <span className="text-paper/75 text-sm md:text-base">{f.variantCount} variants</span>
-              )}
-              {f.price > 0 && (
-                <>
-                  {f.variantCount > 1 && <span className="text-paper/30">·</span>}
-                  <span className="text-paper/75 text-sm md:text-base">
-                    from <b className="text-paper font-extrabold">₹{f.price.toLocaleString('en-IN')}</b>
-                  </span>
-                </>
-              )}
-              {f.off > 0 && <span className="gl-lbl text-[10px] text-white bg-brand px-2 py-0.5">{f.off}% off</span>}
-            </div>
-            </div>
-
-            {/* One small way out: the tiles already open each product, so the
-                big "Get the offer" / "Shop all" pair was two routes to the same
-                places. */}
-            <button onClick={onShop}
-              className="group mt-4 md:mt-6 inline-flex h-9 items-center gap-2.5 rounded-full border border-white/25 pl-4 pr-1 text-[12px] font-semibold text-paper transition-colors hover:border-white/60">
-              Shop all
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
-                <i className="fa-solid fa-arrow-right text-[10px]" />
-              </span>
-            </button>
-
-            {/* not on phones: the announcement bar right above already says all three,
-                and the room is better spent on the product photos */}
-            <div className="mt-6 hidden sm:flex flex-nowrap gap-x-5 overflow-hidden whitespace-nowrap">
-              {['48h dispatch', 'Partial COD', 'Free replacement if damaged'].map((t) => (
-                <span key={t} className="flex items-center gap-2 text-[11px] font-semibold text-paper/60">
-                  <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-brand" />{t}
-                </span>
-              ))}
-            </div>
-
-            {n > 1 && (
-              <div className="mt-4 md:mt-7 flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  {features.map((s, di) => (
-                    <button key={s.id || di} onClick={() => setI(di)} aria-label={`Show ${s.name}`}
-                      className={`h-1 transition-all duration-300 ${di === idx ? 'w-7 bg-brand' : 'w-3 bg-white/30 hover:bg-white/60'}`} />
-                  ))}
-                </div>
-                <span className="gl-lbl text-[10px] text-paper/40 tabular-nums">
-                  {String(idx + 1).padStart(2, '0')}/{String(n).padStart(2, '0')}
-                </span>
-                <div className="flex items-center gap-1.5 ml-auto md:ml-2">
-                  <button onClick={() => go(-1)} aria-label="Previous"
-                    className="grid place-items-center w-8 h-8 border border-white/20 text-paper/70 hover:text-paper hover:border-white/50 transition-colors">
-                    <i className="fa-solid fa-chevron-left text-[10px]" />
-                  </button>
-                  <button onClick={() => go(1)} aria-label="Next"
-                    className="grid place-items-center w-8 h-8 border border-white/20 text-paper/70 hover:text-paper hover:border-white/50 transition-colors">
-                    <i className="fa-solid fa-chevron-right text-[10px]" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-
-          <div className="order-1 md:order-2 flex-1 min-w-0 w-full">
-            <div className="relative">
-              {/* only the photos are keyed (new product = new set, fades in);
-                  the scrub row below stays mounted */}
-              <div
-                key={`r-${f.id}`}
-                ref={railRef}
-                className="un-in flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
-                style={{ touchAction: 'pan-x' }}
-              >
-                {f.tiles.map((t, i) => (
-                  /* Fixed width AND fixed aspect, so every tile is the same size
-                     whatever the photo's ratio is - the shots run 0.75 to 1.0,
-                     and sizing each tile to its own photo made the rail change
-                     size every time the banner rotated. */
-                  <button
-                    key={t.key}
-                    onClick={() => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onVariant(f.id, t.sku); }}
-                    aria-label={`Shop ${t.label}`}
-                    className="group relative shrink-0 snap-start text-left overflow-hidden rounded-lg border border-white/10 bg-un-ink2 w-[58vw] max-w-[260px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
-                  >
-                    <div className="relative w-full aspect-[4/5] overflow-hidden">
-                      {/* The photo is contained (not cropped); the tile's
-                          bg-surface fills any letterbox. A blurred full-size
-                          copy used to sit behind it - removed, its blur filter
-                          was repainted on every swipe and slowed low-end phones.
-                          Only the first tile is the LCP candidate: it alone is
-                          eager + high priority, the rest are lazy, so React
-                          doesn't emit a <link rel=preload> for them. */}
-                      <img
-                        src={t.img}
-                        alt={t.label}
-                        loading={i === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={i === 0 ? 'high' : undefined}
-                        decoding={i === 0 ? undefined : 'async'}
-                        onError={onImgErr}
-                        className="relative w-full h-full object-cover transition-transform duration-[900ms] group-hover:scale-[1.05]"
-                      />
-                      {/* name on the photo (cover-cropped, no cream letterbox bands
-                          or a separate white strip): reads as one premium tile */}
-                      <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-10">
-                        <span className="min-w-0 text-[13px] font-bold leading-tight text-white line-clamp-2">{t.label}</span>
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
-                          <i className="fa-solid fa-arrow-right text-[10px]" />
-                        </span>
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* desktop scrub - mobile just swipes */}
-              {/* always laid out (hidden, not removed, for a 1-photo product) so the desktop hero never changes height */}
-              <div className={`hidden md:flex items-center gap-2 mt-3 ${f.tiles.length > 1 ? '' : 'invisible'}`}>
-                  <button onClick={() => scrollRail(-1)} aria-label="Scroll variants left"
-                    className="grid place-items-center w-8 h-8 border border-white/20 text-paper/70 hover:text-paper hover:border-white/50 transition-colors">
-                    <i className="fa-solid fa-chevron-left text-[10px]" />
-                  </button>
-                  <button onClick={() => scrollRail(1)} aria-label="Scroll variants right"
-                    className="grid place-items-center w-8 h-8 border border-white/20 text-paper/70 hover:text-paper hover:border-white/50 transition-colors">
-                    <i className="fa-solid fa-chevron-right text-[10px]" />
-                  </button>
-                  <span className="gl-lbl text-[10px] text-paper/40 ml-1">
-                    {String(f.tiles.length).padStart(2, '0')} {f.variantCount > 1 ? 'variants' : 'views'} · swipe
-                  </span>
-                </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── BOTTOM: the rest of the drop ─────────────────────────────
-             Only what the featured rotation above has NOT already shown, so
-             the same piece is not on screen twice. The row ends on a Shop-all
-             tile rather than trailing off into dead space, and the tiles
-             stretch to share whatever width is left - a short catalogue fills
-             the row instead of leaving a gap, a long one just scrolls. */}
-        {/* light band: breaks the all-black first screen, and the white cards read as cards */}
-        <div className="shrink-0 bg-paper text-ink border-t border-hair px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
-          <div className="flex items-center justify-between gap-4 mb-3">
-            <h3 className="text-[15px] font-extrabold text-ink md:text-lg">More to explore</h3>
-            {/* <span className="gl-lbl text-[10px] text-paper/50">
-              {strip.isRest ? 'More from the drop' : 'The drop'} · {String(strip.items.length).padStart(2, '0')} pieces
-            </span> */}
-            <div className="flex items-center gap-3">
-              <button onClick={onShop}
-                className="gl-lbl text-[10px] text-ink/70 hover:text-brand border-b border-ink/25 hover:border-brand pb-0.5 transition-colors">
-                Shop all →
-              </button>
-              {/* desktop arrows - phones just swipe */}
-              <div className="hidden md:flex items-center gap-1.5">
-                <button onClick={() => pageStrip(-1)} aria-label="Previous products"
-                  className="grid place-items-center w-8 h-8 border border-ink/20 text-ink/70 hover:text-ink hover:border-ink/50 transition-colors">
-                  <i className="fa-solid fa-chevron-left text-[10px]" />
-                </button>
-                <button onClick={() => pageStrip(1)} aria-label="Next products"
-                  className="grid place-items-center w-8 h-8 border border-ink/20 text-ink/70 hover:text-ink hover:border-ink/50 transition-colors">
-                  <i className="fa-solid fa-chevron-right text-[10px]" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* items-stretch: a row of flush, even-height cards. HomeProductCard's
-              title reserves a fixed 2-line min-height, so a stretched card's
-              extra space lands as blank room below the %-off line, never as
-              a gap between the title and the price. */}
-          {/* shrink-0, NOT grow: every card gets the exact same fixed
-              width. grow let flex distribute leftover row space unevenly
-              across cards (down to small natural-size differences between
-              them), so the square image - sized off its own card's width -
-              came out visibly bigger on some cards than others. A short
-              catalogue just leaves blank space at the row's end now, which
-              reads fine on a horizontal scroller. */}
-          {/* desktop shows exactly 5 cards (tablet 4), the rest scroll in */}
-          <div ref={stripRef} className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll pb-1 snap-x items-stretch">
-            {strip.items.map((p, k) => (
-              <div key={p.productId || k}
-                className="snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[calc((100%_-_48px)/4)] lg:basis-[calc((100%_-_64px)/5)]">
-                <HomeProductCard p={p} index={k} listId="home_drop" listName="The Drop" />
-              </div>
-            ))}
-
-            {/* "Shop all" as one more card of the same width (it used to grow
-                to fill the row: a big empty box). A 2x2 peek of the catalogue
-                makes it read as "more like these", not a blank tile. */}
-            <button
-              onClick={onShop}
-              aria-label={`Shop all ${products.length} pieces`}
-              className="group snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[calc((100%_-_48px)/4)] lg:basis-[calc((100%_-_64px)/5)] gl-press flex flex-col border border-hair bg-white hover:border-brand/60 transition-colors text-left"
-            >
-              <span className="grid grid-cols-2 gap-px bg-hair aspect-square overflow-hidden">
-                {products.slice(0, 4).map((p, k) => (
-                  <img key={p.productId || k} src={productImg(p)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover bg-white transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
-                ))}
-              </span>
-              <span className="flex flex-1 items-center justify-between gap-2 px-3 py-3">
-                <span>
-                  <span className="block text-[13px] font-bold text-ink">Shop all</span>
-                  <span className="gl-lbl text-[9px] text-muted">{String(products.length).padStart(2, '0')} pieces</span>
-                </span>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
-                  <i className="fa-solid fa-arrow-right text-[11px]" />
-                </span>
-              </span>
+            <button onClick={handle} aria-live="polite" className={`un-btn gl-press shrink-0 min-h-[44px] font-bold text-sm px-5 ${added ? 'bg-save text-white' : 'bg-brand text-white'}`}>
+              {!added && <span className="un-fill bg-brandHi" />}
+              {added ? 'Added' : 'Add to cart'}
             </button>
           </div>
         </div>
-      </div>
-    </section>
   );
 };
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
+  const { data: catRes } = useGetCategoriesQuery();
+  const categories = useMemo(() => catRes?.data || [], [catRes]);
   const { data: homeOffersRes } = useGetHomeComboOffersQuery();
+  const homeOffers = useMemo(() => homeOffersRes?.data?.combos || [], [homeOffersRes]);
   const { data: statsRes } = useGetPublicStatsQuery();
   const stats = statsRes?.data;
-  const homeOffers = homeOffersRes?.data?.combos || [];
-  // Admin-managed hero (Operations Hub → Hero banner). No live slide, or every image broken → the built-in hero below.
+
+  // Admin-managed hero (Operations Hub -> Hero banner) wins when it has live slides.
   const { data: heroRes } = useGetHeroBannerQuery();
   const [heroBroken, setHeroBroken] = useState(false);
   const heroSlides = heroBroken ? [] : (heroRes?.data?.slides || []);
 
-  /* products?featured=true currently answers "No Published Product found"
-     even though a product does carry the tag, so this cannot be the only
-     source - when it comes back empty, fall back to the catalogue we have
-     already loaded rather than to productImg(undefined), which resolves to
-     the logo placeholder. That fallback is what put the logo on the page. */
   const featured = useMemo(() => productList(featRes)[0] || products[0], [featRes, products]);
-  // Mobile sticky bar's "Add" (StickyAddBar below). Restored: it was removed with
-  // the free-shipping bundle section but the sticky bar still calls it.
-  const dispatch = useDispatch();
   const addOne = (p) => {
     const v = firstVariant(p);
     dispatch(addItem({ id: p.productId, mongoId: p.productId, name: p.productName, price: v.variantPrice, image: v.variantImage?.[0], quantity: 1, selectedVariant: v.variantName }));
     trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, quantity: 1 });
   };
-  const heroImg = productImg(featured);
 
-  // Auto-carousel of the featured product's own shots (different images, one product)
-  const carouselImages = useMemo(() => {
-    const real = (list) => [...new Set(list.filter((x) => x && !x.includes('/assets/logo')))];
-
-    const gallery = real((firstVariant(featured)?.variantImage || []));
-    if (gallery.length > 1) return gallery;
-
-    const own = real([...gallery, ...(featured?.secondaryImages || []), featured?.productImg]);
-    if (own.length > 1) return own;
-
-    /* Still thin - build the reel from the catalogue instead, so the coverflow
-       always has something to rotate. A single-image "carousel" reads as a
-       broken carousel, and a single LOGO image reads as a broken page. */
-    const across = real(products.map(productImg)).slice(0, 8);
-    return across.length ? across : own.length ? own : gallery;
-  }, [featured, products]);
-
-
-  // ── Catalog-size-aware merchandising ──────────────────────────────
-  // Below MERCH_THRESHOLD we can't fill separate Bestsellers / New /
-  // Feed grids without repeating the same SKUs, so we show ONE curated
-  // "Collection" and lean on editorial + the bundle. Cross the threshold
-  // and the page automatically splits into differentiated, tag-driven
-  // sections. Nothing here hardcodes the current 2-product catalog.
-  const MERCH_THRESHOLD = 8;
-  const n = products.length;
-  const isFewProducts = n > 0 && n < MERCH_THRESHOLD;
-
-  const byTag = (t) => products.filter((p) => (p.tags || []).includes(t));
-
-  /* A tagged section shows ONLY what carries the tag. It used to fall back to
-     the whole catalogue whenever fewer than four products were tagged, which
-     is why untagged pieces were appearing under "Bestsellers" - a shopper
-     reading that row was being told something untrue about them. Too few to
-     be a row now hides the row instead. */
+  // Tagged rows show only what really carries the tag; too few hides the row.
   const MIN_TAGGED = 2;
+  const byTag = (t) => products.filter((p) => (p.tags || []).includes(t));
   const bestsellers = byTag('best_seller').slice(0, 8);
-  const arrivals = byTag('new_arrival').slice(0, 8);
-
-  // Sizing for the single "Collection" grid so 2-7 products never look stranded.
-  const colsFor = (k) => (k <= 2 ? 'grid-cols-2 max-w-[720px]'
-    : k === 3 ? 'grid-cols-2 lg:grid-cols-3 max-w-[1040px]'
-    : 'grid-cols-2 lg:grid-cols-4');
-  const collectionCols = colsFor(n);
-
-  const collections = useMemo(() => {
-    const seen = [];
-    products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
-    const soon = [{ name: 'Wall Posters', img: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80', soon: true }, { name: 'Desk Décor', img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80', soon: true }];
-    // Same order as the header (Gaming in Superheroes' old slot), then the "soon" fillers.
-    return [...sortByCategoryPriority(seen, (c) => c.name), ...soon].slice(0, 4);
-  }, [products]);
-  const hasRealCollections = collections.filter((c) => !c.soon).length >= 3;
+  const arrivals = byTag('new_arrival').filter((p) => !bestsellers.slice(0, 4).includes(p)).slice(0, 8);
 
   const { data: testRes } = useGetTestimonialsQuery();
-  const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
-  const fallbackReviews = [
-    { userName: 'Aryan', content: "The red glow is unreal on a late-night setup. Way cooler in person.", rating: 5 },
-    { userName: 'Simran', content: "Gifted the Porsche caliper - my brother hasn't turned it off since.", rating: 5 },
-    { userName: 'Kabir', content: "Pen stand is tiny but adorable. Desk finally looks intentional.", rating: 4 },
-  ];
-  // Google reviews (4★+, with text) lead the wall; our own approved testimonials follow.
   const { data: googleRes } = useGetGoogleReviewsQuery();
   const google = googleRes?.data?.configured ? googleRes.data : null;
-  const googleReviews = (google?.reviews || []).filter((r) => r.rating >= 4)
-    .map((r) => ({ userName: r.author, content: r.text, rating: r.rating, photo: r.authorPhoto, url: r.url || google.mapsUrl, source: 'google' }));
-  const ownReviews = [...googleReviews, ...testimonials];
-  const reviews = ownReviews.length ? ownReviews : fallbackReviews;
+  const reviews = useMemo(() => {
+    const g = (google?.reviews || []).filter((r) => r.rating >= 4 && r.text)
+      .map((r) => ({ userName: r.author, content: r.text, rating: r.rating, photo: r.authorPhoto, source: 'google' }));
+    return [...g, ...(testRes?.data?.testimonials || [])];
+  }, [google, testRes]);
+  const rating = google?.rating ? google.rating.toFixed(1) : shownRating(stats);
+  const reviewTotal = google?.total || shownCount(stats, 'totalReviews');
+
+  const catTiles = useMemo(() => categories.filter((c) => c.kind === 'category' && c.itemCount > 0).map((c) => {
+    const p = products.find((x) => x.productCategory?.toLowerCase() === c.name.toLowerCase());
+    return { ...c, img: p ? productImg(p) : null, cut: p ? (productImg(p)) : null };
+  }).filter((c) => c.img).sort((a, b) => b.itemCount - a.itemCount).slice(0, 4), [categories, products]);
+
+  // Page = coloured blocks in order; a wave is drawn wherever the colour changes.
+  const blocks = [
+    heroSlides.length
+      ? { k: 'hero', c: 'ink', node: <HeroBanner slides={heroSlides} autoplay={heroRes?.data?.autoplay} onEmpty={() => setHeroBroken(true)} /> }
+      : { k: 'hero', c: 'cream', node: <Hero products={products} offers={homeOffers} rating={rating} reviewCount={reviewTotal} onOpen={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)} /> },
+    catTiles.length >= 2 && { k: 'cat', c: 'lime', node: <CategoryGrid tiles={catTiles} /> },
+    bestsellers.length >= MIN_TAGGED && { k: 'fest', c: 'mustard', node: <FestiveSections lead={<FestiveOfferBand products={products} />} /> },
+    (isLoading || bestsellers.length >= MIN_TAGGED) && { k: 'best', c: 'red', node: <Bestsellers items={bestsellers} loading={isLoading} total={products.length} /> },
+    { k: 'why', c: 'forest', node: <WhyUs orders={Number(stats?.totalOrders) || 0} /> },
+    { k: 'new', c: 'cream', node: <><PhotoMarquee products={products} />{arrivals.length >= MIN_TAGGED && <Arrivals items={arrivals} />}<SeriesStrip categories={categories} /></> },
+    reviews.length > 0 && { k: 'rev', c: 'forest', node: <ReviewSlider reviews={reviews} rating={rating} total={reviewTotal} google={google} products={products} /> },
+    { k: 'end', c: 'cream', node: <><ClosingBand products={products} /><Faq /><BigSign products={products} /></> },
+  ].filter(Boolean);
 
   useEffect(() => {
     if (products.length) trackViewItemList?.({ listName: 'Home', listId: 'home', items: products.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
   }, [products]);
 
   return (
-    <div className="font-inter bg-paper text-ink">
-      <SEOHead url="/" />
-      {/* The page's one H1: what the store is (the hero's rotating product names are H2s). */}
+    <div className="font-inter bg-cream text-ink overflow-x-clip">
+      <SEOHead url="/" structuredData={FAQ_LD} />
+      <style>{`.un-bento{box-shadow:0 1px 2px rgba(20,20,20,.05),0 8px 24px -14px rgba(20,20,20,.18);transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s}@media (hover:hover){.un-bento:hover{transform:scale(1.02);box-shadow:0 2px 4px rgba(20,20,20,.06),0 22px 44px -20px rgba(20,20,20,.3)}.un-bento:hover .gl-img{transform:scale(1.05)}.un-bento:hover .gl-img2{opacity:1}}@media (prefers-reduced-motion:reduce){.un-bento,.un-bento:hover{transform:none;transition:none}}
+.un-cut{filter:drop-shadow(0 14px 18px rgb(0 0 0 / .28))}.un-dark .un-cut,.un-cut-dark{filter:drop-shadow(0 18px 26px rgb(0 0 0 / .6))}.un-blend{overflow:hidden;box-shadow:0 30px 70px -25px rgb(0 0 0 / .8),0 0 90px -20px rgb(var(--gl-brand) / .45)}.un-orb{overflow:hidden;box-shadow:0 16px 36px -14px rgb(0 0 0 / .75)}
+.un-kb{animation:un-kb 16s ease-in-out infinite alternate;transform-origin:60% 50%}@keyframes un-kb{to{transform:scale(1.07)}}
+.un-bob{animation:un-bob 6s ease-in-out infinite}@keyframes un-bob{0%,100%{translate:0 0}50%{translate:0 -14px}}
+.un-spin{animation:un-spin 20s linear infinite}@keyframes un-spin{to{transform:rotate(360deg)}}
+.un-wave{animation:un-wave 16s linear infinite}@keyframes un-wave{to{transform:translateX(-50%)}}
+.un-crumple::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.14;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='700' height='700'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.007' numOctaves='4' seed='9'/><feDiffuseLighting lighting-color='%23fff' surfaceScale='4'><feDistantLight azimuth='45' elevation='50'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.un-pop{animation:un-pop .55s cubic-bezier(.22,1,.36,1) both}@keyframes un-pop{from{opacity:0;transform:translateY(30px) rotate(-5deg) scale(.92)}}
+@keyframes un-rv{from{opacity:0;transform:translateY(28px)}}
+@supports (animation-timeline: view()){@media (prefers-reduced-motion:no-preference){.un-rv{animation:un-rv linear both;animation-timeline:view();animation-range:entry 0% entry 35%}}}
+.un-marq{animation:un-marq 80s linear infinite}.un-marq-wrap[data-hold] .un-marq{animation-play-state:paused}@keyframes un-marq{to{transform:translateX(-50%)}}
+.un-qa{display:grid;place-items:center}.un-qa-full{display:none}
+@media (hover:hover) and (pointer:fine){.un-qa{left:.75rem;transform:translateY(140%);opacity:0;transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .25s}.un-bento:hover .un-qa,.un-qa:focus-visible{transform:none;opacity:1}.un-qa-full{display:block}.un-qa-icon{display:none}}
+@media (prefers-reduced-motion:reduce){.un-pop,.un-kb,.un-bob,.un-spin,.un-wave,.un-marq{animation:none}.un-qa{transition:none}}`}</style>
       <h1 className="sr-only">UrbanNook - 3D printed desk lamps, anime katanas and home decor, made in India</h1>
 
-      {/* ══ HERO - admin banner slides when any are live, else the drop ══ */}
-      {heroSlides.length ? (
-        <HeroBanner slides={heroSlides} autoplay={heroRes?.data?.autoplay} onEmpty={() => setHeroBroken(true)} />
-      ) : (
-      <HeroCarousel
-        products={products}
-        offers={homeOffers}
-        /* a variant tile goes straight to that variant's page, not the list */
-        onVariant={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)}
-        onShop={() => navigate('/products')}
-      />
-      )}
+      {blocks.map((b, i) => (
+        <Fragment key={b.k}>
+          {i > 0 && blocks[i - 1].c !== b.c && <Wave bg={COL[blocks[i - 1].c][0]} fill={COL[b.c][1]} />}
+          <div className={COL[b.c][0]}>{b.node}</div>
+        </Fragment>
+      ))}
 
-
-
-      {/* ══ MARQUEE ══ - butted straight against the plate, no gutter: both
-          are ink, so the hero runs into the band with no visible seam. */}
-      {/* <MarqueeBand /> */}
-
-      {/* ══ CATEGORY PILLS ══ */}
-      {/* <Reveal className="max-w-[1280px] mx-auto px-5 pt-8" y={18}>
-        <div className="flex gap-2.5 overflow-x-auto gl-hscroll pb-1">
-          <button onClick={() => navigate('/products')} className="shrink-0 un-btn gl-press bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full">
-            <span className="un-fill bg-brandHi"></span>Shop All
-          </button>
-          {['💡 Lamps', '✏️ Pen Stands', '🎁 Gifting', 'Under ₹500', '✨ New'].map((c) => (
-            <button key={c} onClick={() => navigate('/products')} className="shrink-0 gl-press border border-hair bg-white text-sm font-semibold px-5 py-2.5 rounded-full hover:border-ink transition-colors">{c}</button>
-          ))}
-        </div>
-      </Reveal> */}
-
-      {/* ══ SOCIAL PROOF + PAYMENT - editorial stat tiles ══ */}
-    
-      {/* ══ PRODUCTS - adaptive to catalog size ══ */}
-      {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
-      {/* sale header (price drops) + combo offers as one section */}
-      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} />} />}
-      <RangoliDivider />
-      {isFewProducts ? (
-        /* Small, curated catalog: ONE collection, no repeated grids. */
-        <section className="bg-surface border-y border-hair mt-4">
-          <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-            <SecHead index="01" kicker="The Collection" title="Everything we make" onView={() => navigate('/products')} />
-            {isLoading
-              ? <div className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`}>{[...Array(Math.max(n, 2))].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{products.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
-            <Reveal className="text-center mt-4 md:mt-6">
-              <p className="text-muted text-sm max-w-md mx-auto">A tight, made-to-order range - no filler, no warehouse leftovers. <b className="text-ink">More drops on the way.</b></p>
-            </Reveal>
-          </div>
-        </section>
-      ) : bestsellers.length >= MIN_TAGGED ? (
-        /* Full catalog: differentiated, tag-driven Bestsellers grid. */
-        <section className="bg-surface border-y border-hair mt-4">
-          <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-            <SecHead index="01" kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
-            {isLoading
-              ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${colsFor(bestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{bestsellers.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
-          </div>
-        </section>
-      ) : null}
-
-
-
-
-        <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>
-        <div className="border border-hair overflow-hidden">
-          <div className="h-1 bg-brand"></div>
-          {/* bold stat tiles with hairline grid (gap-px over a hair bg) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-hair">
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <div className="flex items-baseline gap-1">
-                <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none tabular-nums">{shownRating(stats)}</span>
-                <span className="text-muted text-xs font-bold">/5</span>
-              </div>
-              <span className="text-star text-[10px] mt-1 tracking-tight">★★★★★</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1">{shownCount(stats, 'totalReviews')}+ reviews</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">{shownCount(stats, 'totalOrders').toLocaleString('en-IN')}+</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Orders placed</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">100%</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Made in India 🇮🇳</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              {/* the Return policy: 3 days from delivery, damaged / defective / wrong items */}
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">3-Day</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Damage replacement</span>
-            </div>
-          </div>
-          {/* secure-checkout + payment strip */}
-          {/* <div className="border-t border-hair bg-white px-4 py-2.5 flex items-center justify-center gap-x-3 gap-y-1.5 flex-wrap">
-            <span className="gl-lbl text-[9px] text-ink flex items-center gap-1.5">
-              <i className="fa-solid fa-lock text-[9px] text-save" /> Secure checkout
-            </span>
-            <span className="hidden sm:block w-px h-3.5 bg-hair" />
-            <div className="flex items-center gap-1.5 flex-wrap justify-center">
-              {['VISA', 'Mastercard', 'UPI', 'RuPay', 'Partial COD'].map((x) => (
-                <span key={x} className="gl-lbl text-[9px] text-muted border border-hair px-2 py-1 bg-surface">{x}</span>
-              ))}
-            </div>
-          </div> */}
-        </div>
-      </Reveal>
-
-
-      {/* The combo-banner "Bundle - free-shipping cross-sell" section (and
-          the useGetAllFreeShippingBannersQuery it read from) was removed
-          entirely 2026-10-09, same sweep as FreeShippingBanner/
-          ProductPageBanner - see MiniCartPreview.jsx's file-header note. A
-          Promotion V2-based replacement is a deliberate follow-up, not yet
-          built. */}
-
-      {/* ══ NEW ARRIVALS - rail; only what actually carries the tag ══ */}
-      {/* {!isFewProducts && arrivals.length >= MIN_TAGGED && (
-        <section className="max-w-[1280px] mx-auto px-5 pb-4">
-          <SecHead index="02" kicker="Fresh Drop" title="New Arrivals" onView={() => navigate('/products')} />
-          <Stagger className="flex gap-4 md:gap-6 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-3 -mx-5 px-5" stagger={0.06}>
-            {arrivals.map((p, i) => (
-              <StaggerItem key={p.productId || i} className="shrink-0 w-[68vw] sm:w-[280px] snap-start">
-                <HomeProductCard p={p} index={i} listId="home_new" listName="New Arrivals" />
-              </StaggerItem>
-            ))}
-          </Stagger>
-        </section>
-      )} */}
-
-      {/* ══ STATEMENT - hero carousel on top, manifesto below ══ */}
-      <section className="my-6 bg-ink text-paper border-y border-white/10 overflow-hidden">
-        <div className="max-w-[1100px] mx-auto px-7 md:px-12 py-12 md:py-24 flex flex-col items-center text-center">
-          {/* CAROUSEL - 3D curved coverflow of the product's shots */}
-          <div className="relative w-full max-w-[1000px]">
-            {/* warm ambient glow behind the stage */}
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ width: '460px', height: '460px', background: 'radial-gradient(circle, rgba(232,93,39,0.38) 0%, rgba(230,51,41,0.12) 42%, transparent 70%)' }} />
-            {/* Nothing to rotate before the catalogue lands - an empty stage
-                is better than a stage of placeholders. */}
-            {carouselImages.length > 0 && <CoverflowCarousel images={carouselImages} />}
-          </div>
-
-          {/* MANIFESTO - below the carousel */}
-          <div className="mt-10 md:mt-14 max-w-2xl">
-            <p className="gl-lbl mb-4 text-brand">The UrbanNook Way</p>
-            <TextReveal as="h2" text="Built to order. Not to sit in a warehouse." delay={0.1} className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95] text-paper" />
-            <Reveal delay={0.2} className="mt-6 text-paper/70 text-base md:text-lg mx-auto max-w-md">Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.</Reveal>
-            <motion.div className="mt-8 h-px w-24 bg-white/30 mx-auto origin-center" initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} />
-            <div className="mt-8 grid grid-cols-3 gap-4 max-w-md mx-auto">
-              {statsFor(stats?.totalOrders).map((s) => (
-                <div key={s.label}>
-                  <div className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight tabular-nums text-paper"><CountUp to={s.to} suffix={s.suffix} /></div>
-                  <div className="gl-lbl text-[9px] mt-1.5 text-paper/50">{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══ SHOP BY COLLECTION - only when there are real categories to browse ══ */}
-      {!isFewProducts && hasRealCollections && (
-        <section className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-          <SecHead index="03" kicker="Find Your Corner" title="Shop by Collection" />
-          <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4" stagger={0.07}>
-            {collections.map((c, i) => (
-              <StaggerItem key={i}>
-                <button onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard un-card group relative rounded-none overflow-hidden aspect-[4/5] bg-hair cursor-pointer text-left w-full">
-                  <img src={c.img} alt={c.name} loading="lazy" className="gl-img absolute inset-0 w-full h-full object-cover" onError={onImgErr} />
-                  <span className="un-glare"></span>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></div>
-                  {c.soon && <span className="absolute top-3 left-3 z-[3] gl-lbl text-[8px] bg-white/90 text-ink px-2 py-1 rounded">Coming soon</span>}
-                  <div className="absolute bottom-0 p-4 text-white z-[3]"><p className="font-archivo font-extrabold text-lg tracking-tight">{c.name}</p><p className="text-white/70 text-xs">{c.soon ? 'Notify me' : 'Shop now →'}</p></div>
-                </button>
-              </StaggerItem>
-            ))}
-          </Stagger>
-        </section>
-      )}
-
-      {/* ══ SHOP THE FEED - needs enough distinct products to avoid repeats ══ */}
-      {/* {!isFewProducts && (
-        <section className="bg-surface border-y border-hair">
-          <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-            <Reveal className="text-center mb-8"><Kicker className="justify-center">@urbannook.store</Kicker><h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Shop the Feed</h2><p className="text-muted text-sm mt-2">Tap a shot to shop it</p></Reveal>
-            <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-3" stagger={0.06}>
-              {products.slice(0, 8).map((p, i) => (
-                <StaggerItem key={i}>
-                  <button onClick={() => navigate(`/product/${p.productId}`)} className="gl-pcard un-card group relative aspect-square rounded-none overflow-hidden bg-hair cursor-pointer w-full">
-                    <img src={productImg(p)} alt="" loading="lazy" className="gl-img w-full h-full object-cover" onError={onImgErr} />
-                    <span className="un-glare"></span>
-                    <span className="absolute bottom-3 left-3 z-[3] bg-white/90 backdrop-blur text-ink text-xs font-bold px-2.5 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">Shop this →</span>
-                  </button>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </div>
-        </section>
-      )} */}
-
-      {/* ══ TESTIMONIALS - two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
-      <section className="bg-paper py-4 md:py-20 overflow-hidden">
-        <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
-          <div>
-            <Kicker>{google?.rating ? `★ ${google.rating.toFixed(1)} on Google · ${google.total} reviews` : `★ ${shownRating(stats)} · ${shownCount(stats, 'totalReviews')}+ reviews`}</Kicker>
-            <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Straight from your desks</h2>
-          </div>
-          <span className="hidden sm:block gl-lbl text-[10px] text-faint whitespace-nowrap">Hover to pause · zoom · tap to shop</span>
-        </Reveal>
-
-        <div className="relative">
-          {/* edge fades */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-14 md:w-28 bg-gradient-to-r from-paper to-transparent z-10" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-14 md:w-28 bg-gradient-to-l from-paper to-transparent z-10" />
-
-          {/* single fast row */}
-          <div className="un-marquee" style={{ animationDuration: '22s' }}>
-            {[0, 1].map((dup) => (
-              <div key={dup} className="flex shrink-0" aria-hidden={dup === 1}>
-                {reviews.map((t, i) => {
-                  const prod = products.length ? products[i % products.length] : null;
-                  const open = t.source === 'google' && t.url ? () => window.open(t.url, '_blank', 'noopener') : () => prod && navigate(`/product/${prod.productId}`);
-                  return <ReviewCard key={i} t={t} img={prod ? productImg(prod) : heroImg} tag={t.source === 'google' ? 'Read on Google' : prod?.productName || 'UrbanNook'} onClick={open} />;
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {google && (
-          <div className="max-w-[1280px] mx-auto px-5 mt-6 flex flex-wrap items-center justify-center gap-3">
-            <a href={google.writeReviewUrl} target="_blank" rel="noopener noreferrer" className="gl-lbl text-[11px] bg-ink text-paper px-4 py-2.5 hover:bg-brand transition">★ Write a review on Google</a>
-            {google.mapsUrl && <a href={google.mapsUrl} target="_blank" rel="noopener noreferrer" className="gl-lbl text-[11px] border border-ink text-ink px-4 py-2.5 hover:bg-ink hover:text-paper transition">See all reviews on Google →</a>}
-            <span className="w-full text-center text-[10px] text-faint">Google reviews shown as provided by Google.</span>
-          </div>
-        )}
-      </section>
-
-      {/* ══ FAQ ══ */}
-      <FaqSection onContact={() => navigate('/contact-us')} />
-
-      {/* ══ REFER & SAVE ══ */}
-      <ReferSave />
-
-      {/* ══ NEWSLETTER - doubles as the "we're just getting started" beat ══ */}
-      <section className="max-w-[820px] mx-auto px-5 py-5 md:py-20 text-center">
-        <Kicker className="justify-center mb-3">{isFewProducts ? 'The next drop' : 'Join the list'}</Kicker>
-        <TextReveal as="h2" text={isFewProducts ? 'Be first to the next piece' : 'Get first access to drops'} className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight" />
-        <p className="text-muted mt-4">{/* no first-order discount exists (only flat ₹ coupons) - don't promise one */}{isFewProducts ? 'We add new made-to-order pieces often. Join for early access to new drops and offers.' : 'New pieces land often. Members get early access to new drops and offers.'}</p>
-        <form onSubmit={(e) => e.preventDefault()} className="mt-7 flex max-w-md mx-auto rounded-xl overflow-hidden border border-ink bg-white">
-          <input type="email" placeholder="Enter your email" className="flex-1 px-4 py-4 text-sm outline-none bg-transparent" />
-          <button className="un-btn gl-press bg-brand text-white font-bold text-sm px-7"><span className="un-fill bg-brandHi"></span>Join</button>
-        </form>
-        <p className="gl-lbl text-[9px] text-faint mt-4">No spam · Unsubscribe anytime</p>
-      </section>
-
-      {/* ══ ABOUT - compact brand intro, kept at the bottom above the footer ══ */}
-      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal
-             ask rather than an exception. Replaces the old "About" panel:
-             that told people who we are, this gives them something to do. ══ */}
-      <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-16">
-        <Reveal className="relative overflow-hidden bg-surface border border-hair p-8 md:p-14">
-          <span aria-hidden="true" className="pointer-events-none select-none absolute -right-3 -bottom-10 md:-bottom-16 font-archivo text-[6rem] md:text-[13rem] font-extrabold text-ink/[0.04] leading-none tracking-tight">YOURS</span>
-          <div className="relative max-w-2xl">
-            <p className="gl-lbl text-brand mb-4">Customization · Made to order</p>
-            <TextReveal as="h2" text="Make it yours." className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]" />
-            <p className="mt-5 text-muted text-base md:text-lg max-w-xl">
-              Nothing here sits in a warehouse - every piece is 3D-printed once you order it.
-              So a different colour, your name on the side, or a livery we don&apos;t stock is a
-              normal ask. Tell us what you want and we&apos;ll come back with what&apos;s
-              possible and <span className="text-ink font-semibold">what it costs</span>.
-            </p>
-            <Stagger className="mt-6 flex flex-wrap gap-2" stagger={0.05}>
-              {['Custom colours', 'Name / text on it', 'Your own livery', 'Gifting', 'Bulk orders'].map((t) => (
-                <StaggerItem key={t} as="span" className="gl-lbl text-[10px] border border-hair bg-white px-3 py-1.5">{t}</StaggerItem>
-              ))}
-            </Stagger>
-            <button onClick={() => navigate('/customize')} className="un-btn gl-press mt-7 bg-ink text-paper font-bold text-sm px-7 py-3.5">
-              <span className="un-fill bg-brand"></span>Customize a piece
-            </button>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* mobile sticky add-to-cart - featured product */}
       <StickyAddBar product={featured} onAdd={() => featured && addOne(featured)} />
     </div>
   );
 };
 
-// MotionRoot: reduced-motion setting for this page's animations (component/motion).
-const HomePageWithMotion = () => <MotionRoot><HomePage /></MotionRoot>;
-
-export default HomePageWithMotion;
+export default HomePage;

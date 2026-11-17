@@ -9,20 +9,20 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // matches the server's multer limit
 
 const Field = ({ label, required, error, hint, children }) => (
   <div className="space-y-1.5">
-    <label className="flex items-center gap-1 gl-lbl text-[10px] text-muted">
+    <label className="flex items-center gap-1 gl-lbl text-[10px] text-ink/70">
       {label} {required && <span className="text-brand normal-case">*</span>}
     </label>
     {children}
     {error ? (
       <p className="text-sale text-xs">{error}</p>
     ) : hint ? (
-      <p className="text-faint text-xs">{hint}</p>
+      <p className="text-ink/60 text-xs">{hint}</p>
     ) : null}
   </div>
 );
 
 const inputCls =
-  'w-full p-3.5 bg-white border border-hair rounded-xl text-sm text-ink outline-none transition-colors focus:border-ink';
+  'w-full p-3.5 bg-white border border-ink rounded-xl text-sm text-ink outline-none transition-colors focus:border-ink';
 
 /**
  * Customization request page.
@@ -135,21 +135,21 @@ const CustomizePage = () => {
 
   if (done) {
     return (
-      <div className="bg-paper min-h-screen font-inter text-ink">
+      <div className="bg-cream min-h-screen font-inter text-ink">
         <SEOHead title="Customization request sent" url="/customize" noIndex />
         <section className="max-w-xl mx-auto px-5 py-24 md:py-32 text-center">
           <p className="gl-lbl text-brand mb-3">Request received</p>
-          <h1 className="font-archivo text-4xl md:text-5xl font-extrabold tracking-tight leading-[1.05]">
+          <h1 className="text-4xl md:text-5xl leading-[1.05] font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
             We&apos;ll be in touch.
           </h1>
-          <p className="text-muted mt-5">
+          <p className="text-ink/70 mt-5">
             Our team reads every customization request and replies on
             {' '}<b className="text-ink">{form.email.trim()}</b> - usually within a working day.
           </p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <button
               onClick={() => navigate('/products')}
-              className="gl-press bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl hover:bg-brandHi transition-colors"
+              className="gl-press bg-brand text-white text-sm px-7 py-3.5 rounded-full hover:bg-brandHi transition-colors border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton uppercase tracking-wide min-h-[48px]"
             >
               Keep shopping
             </button>
@@ -160,7 +160,7 @@ const CustomizePage = () => {
                 setImage(null);
                 if (fileRef.current) fileRef.current.value = '';
               }}
-              className="gl-press border border-hair font-bold text-sm px-7 py-3.5 rounded-xl hover:border-ink transition-colors"
+              className="gl-press border border-ink font-bold text-sm px-7 py-3.5 rounded-xl hover:border-ink transition-colors"
             >
               Send another
             </button>
@@ -171,7 +171,7 @@ const CustomizePage = () => {
   }
 
   return (
-    <div className="bg-paper min-h-screen font-inter text-ink">
+    <div className="bg-cream min-h-screen font-inter text-ink">
       <SEOHead
         title="Customize your piece"
         description="Every UrbanNook piece is 3D-printed to order. Tell us the colour, the name or the livery you want and we'll quote it."
@@ -179,14 +179,14 @@ const CustomizePage = () => {
       />
 
       <section className="max-w-3xl mx-auto px-5 pt-24 md:pt-28 pb-6">
-        <nav className="text-sm text-muted mb-6">
-          <Link to="/" className="hover:text-ink">Home</Link> <span className="text-faint">/</span> Customize
+        <nav className="text-sm text-ink/70 mb-6">
+          <Link to="/" className="hover:text-ink">Home</Link> <span className="text-ink/60">/</span> Customize
         </nav>
         <p className="gl-lbl text-brand mb-3">Made to order · Any piece</p>
-        <h1 className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]">
+        <h1 className="text-4xl md:text-6xl leading-[0.95] font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
           Make it yours.
         </h1>
-        <p className="text-muted mt-5 max-w-xl">
+        <p className="text-ink/70 mt-5 max-w-xl">
           Nothing here sits in a warehouse - every piece is printed once you order it. So a
           different colour, a name on the side, or a livery we don&apos;t stock is a normal
           ask. Tell us what you have in mind and we&apos;ll come back with what&apos;s
@@ -195,7 +195,7 @@ const CustomizePage = () => {
       </section>
 
       <section className="max-w-3xl mx-auto px-5 pb-24">
-        <form onSubmit={onSubmit} className="bg-white border border-hair p-6 md:p-9 space-y-5">
+        <form onSubmit={onSubmit} className="bg-white border-[3px] border-ink p-6 md:p-9 space-y-5 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
           <div className="grid md:grid-cols-2 gap-5">
             <Field label="Your name" required error={errors.name}>
               <input className={inputCls} value={form.name} onChange={set('name')} placeholder="Your name" />
@@ -254,7 +254,7 @@ const CustomizePage = () => {
                 type="file"
                 accept="image/*"
                 onChange={onPickImage}
-                className="block text-sm text-muted file:mr-3 file:py-2.5 file:px-4 file:border file:border-hair file:bg-surface file:text-ink file:text-xs file:font-bold file:rounded-xl hover:file:border-ink file:cursor-pointer"
+                className="block text-sm text-ink/70 file:mr-3 file:py-2.5 file:px-4 file:border file:border-ink file:bg-cream file:text-ink file:text-xs file:font-bold file:rounded-xl hover:file:border-ink file:cursor-pointer rounded-2xl min-h-[48px]"
               />
               {image && (
                 <button
@@ -263,7 +263,7 @@ const CustomizePage = () => {
                     setImage(null);
                     if (fileRef.current) fileRef.current.value = '';
                   }}
-                  className="gl-lbl text-[10px] text-faint hover:text-ink transition-colors"
+                  className="gl-lbl text-[10px] text-ink/60 hover:text-ink transition-colors"
                 >
                   Remove
                 </button>
@@ -275,11 +275,11 @@ const CustomizePage = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="gl-press bg-brand text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-brandHi transition-colors disabled:opacity-60"
+              className="gl-press bg-brand text-white text-sm px-8 py-4 rounded-full hover:bg-brandHi transition-colors disabled:opacity-60 border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton uppercase tracking-wide min-h-[48px]"
             >
               {isLoading ? 'Sending…' : 'Send request'}
             </button>
-            <span className="text-xs text-faint">No payment now - we quote first.</span>
+            <span className="text-xs text-ink/60">No payment now - we quote first.</span>
           </div>
         </form>
       </section>

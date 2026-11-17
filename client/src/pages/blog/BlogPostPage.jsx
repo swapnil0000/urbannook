@@ -124,16 +124,16 @@ const BlogPostPage = () => {
   const post = data?.data;
 
   if (isLoading) {
-    return <div className="min-h-[70vh] grid place-items-center bg-[#f3ead8]"><div className="w-12 h-12 border-2 border-[#b7282e] border-t-transparent rounded-full animate-spin" /></div>;
+    return <div className="min-h-[70vh] grid place-items-center bg-cream"><div className="w-12 h-12 border-2 border-[#b7282e] border-t-transparent rounded-full animate-spin" /></div>;
   }
   if (error?.status === 404 || (!error && !post)) return <NotFound />;
   if (error) {
     return (
-      <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
+      <div className="min-h-[70vh] grid place-items-center bg-cream font-inter text-center px-5">
         <SEOHead title="Unable to load" noIndex />
         <div>
-          <h1 className="text-2xl font-extrabold">Unable to load this story</h1>
-          <button onClick={() => window.location.reload()} className="gl-press bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl mt-6 hover:bg-brandHi">Retry</button>
+          <h1 className="text-2xl font-anton uppercase leading-[.95] text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">Unable to load this story</h1>
+          <button onClick={() => window.location.reload()} className="gl-press bg-brand text-white text-sm px-7 py-3.5 rounded-full mt-6 hover:bg-brandHi border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton uppercase tracking-wide min-h-[48px]">Retry</button>
         </div>
       </div>
     );
@@ -200,7 +200,7 @@ const BlogPostPage = () => {
             <Link to="/" className="hover:text-white">Home</Link> <span className="mx-1">·</span> <Link to="/blog" className="hover:text-white">Journal</Link>
           </nav>
           <p className="jp-kicker" data-anim="kicker">UrbanNook Journal · 物語</p>
-          <h1 className="jp-title" data-anim="title">{post.title}</h1>
+          <h1 className="jp-title font-anton uppercase leading-[.95] text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]" data-anim="title">{post.title}</h1>
           <p className="text-sm text-[#e9dcc0]/80 mt-6 tracking-wide">
             {post.author || 'UrbanNook'}{post.publishedAt ? ` · ${date(post.publishedAt)}` : ''}{post.readingMinutes ? ` · ${post.readingMinutes} min read` : ''}
           </p>
@@ -291,7 +291,7 @@ const BlogPostPage = () => {
         <section className="jp-band" data-anim="reviews">
           <div className="max-w-[1100px] mx-auto px-5 py-16">
             <p className="jp-kicker text-center">侍の間 · From our collectors</p>
-            <h2 className="jp-h2 text-center">On real walls, in real rooms</h2>
+            <h2 className="jp-h2 text-center font-anton uppercase leading-[.95]">On real walls, in real rooms</h2>
             <div className="columns-2 md:columns-3 gap-4 mt-10 [&>*]:mb-4">
               {reviews.flatMap((r, ri) => r.images.map((src, ii) => (
                 <figure key={`${ri}-${ii}`} className="jp-photo break-inside-avoid" data-anim="photo">
@@ -316,7 +316,7 @@ const BlogPostPage = () => {
       {products.length > 0 && (
         <section className="max-w-[1100px] mx-auto px-5 py-16" data-anim="shop">
           <p className="jp-kicker text-center">武器庫 · The armoury</p>
-          <h2 className="jp-h2 text-center mb-10">Shop the pieces in this story</h2>
+          <h2 className="jp-h2 text-center mb-10 font-anton uppercase leading-[.95]">Shop the pieces in this story</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p, i) => (
               <UnProductCard key={p.productId} p={p} href={`/product/${p.productId}`} index={i} listId={`blog_${post.slug}`} listName={`Blog: ${post.title}`} showWishlist={false} />

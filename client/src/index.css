@@ -20,6 +20,10 @@
   --gl-muted:    97 92 80;    /* #615C50 Grey-Dark - muted but readable text */
   --gl-faint:    140 135 121; /* #8C8779 Stone Grey - faint text */
   --gl-hair:     216 210 197; /* #D8D2C5 Line - hairline borders (warm) */
+  --gl-cream:   251 235 211; /* #FBEBD3 Cream - revamp page background */
+  --gl-lime:    200 240 49;  /* #C8F031 Lime - hover / highlight */
+  --gl-forest:  14 59 31;    /* #0E3B1F Forest - active chips, dark bands */
+  --gl-mustard: 255 194 26;  /* #FFC21A Mustard - stickers, badges */
   --gl-surface:  229 223 211; /* #E5DFD3 Cream-2 - secondary panels/bands (white cards pop on it) */
 
   /* Colors - Modern Blue & Teal Palette (legacy) */
@@ -534,7 +538,7 @@
 /* film grain */
 .un-grain{position:fixed;inset:-100%;z-index:60;pointer-events:none;opacity:.05;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation:un-grain 8s steps(10) infinite}
+}
 @keyframes un-grain{0%,100%{transform:translate(0,0)}10%{transform:translate(-5%,-8%)}20%{transform:translate(-12%,4%)}30%{transform:translate(6%,-14%)}40%{transform:translate(-4%,12%)}50%{transform:translate(-12%,6%)}60%{transform:translate(10%,0)}70%{transform:translate(0,10%)}80%{transform:translate(-8%,-2%)}90%{transform:translate(4%,6%)}}
 
 /* custom cursor */
@@ -552,14 +556,19 @@
 
 /* 3D tilt + glare cards */
 .un-tiltwrap{perspective:1000px}
-.un-card{transform-style:preserve-3d;will-change:transform;transition:transform .14s cubic-bezier(.2,.7,.2,1),box-shadow .3s cubic-bezier(.2,.7,.2,1)}
+.un-card{transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s cubic-bezier(.2,.7,.2,1)}
+@media(hover:hover) and (pointer:fine){.un-card:hover{transform:translateY(-4px)}}
 .un-glare{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s;
   background:radial-gradient(420px circle at var(--gx,50%) var(--gy,50%),rgba(239,234,224,.55),transparent 45%)}
 .un-card:hover .un-glare{opacity:1}
 
 /* reveal on scroll */
-.un-reveal{opacity:0;transform:translateY(34px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
-.un-reveal.in{opacity:1;transform:none}
+/* pure CSS: visible by default (crawlers / no support), animated by the native scroll timeline */
+@keyframes un-reveal{from{opacity:0;transform:translateY(34px)}}
+@supports (animation-timeline: view()){@media(prefers-reduced-motion:no-preference){.un-reveal{animation:un-reveal linear both;animation-timeline:view();animation-range:entry 0% entry 35%}}}
+/* press feedback */
+.un-btn,.un-chip{transition:scale .25s cubic-bezier(.34,1.8,.64,1)}
+.un-btn:active,.un-chip:active{scale:.95;transition-duration:.1s}
 
 /* char-rise hero */
 @keyframes un-rise{to{transform:none}}
@@ -1004,3 +1013,20 @@ html::-webkit-scrollbar,.un-scroll::-webkit-scrollbar{width:8px;height:8px}
 html::-webkit-scrollbar-track,.un-scroll::-webkit-scrollbar-track{background:transparent}
 html::-webkit-scrollbar-thumb,.un-scroll::-webkit-scrollbar-thumb{background:rgb(var(--gl-ink)/.35);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
 html::-webkit-scrollbar-thumb:hover,.un-scroll::-webkit-scrollbar-thumb:hover{background:rgb(var(--gl-brand));background-clip:padding-box}
+
+/* page-to-page crossfade (Links with viewTransition) - no hard cut between pages */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.28s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+@media (prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}
+
+/* quick-add feedback: button pop + confetti burst (HomeProductCard). Native CSS only. */
+.un-added{animation:un-added .45s cubic-bezier(.34,1.8,.64,1)}
+@keyframes un-added{0%{scale:1}35%{scale:1.18}100%{scale:1}}
+.un-confetti{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center}
+.un-confetti i{position:absolute;width:7px;height:10px;border-radius:2px;border:1.5px solid rgb(var(--gl-ink));opacity:0;
+  animation:un-confetti .75s cubic-bezier(.2,.7,.3,1) forwards}
+.un-confetti i:nth-child(odd){width:8px;height:8px;border-radius:50%}
+@keyframes un-confetti{
+  0%{opacity:1;transform:rotate(var(--a)) translateY(0) scale(.6)}
+  70%{opacity:1}
+  100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(200deg) scale(1)}}
+@media (prefers-reduced-motion:reduce){.un-added{animation:none}.un-confetti{display:none}}

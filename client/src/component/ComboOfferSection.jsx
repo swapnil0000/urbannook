@@ -7,6 +7,7 @@ import { useSiteCampaign, THEME_COPY } from '../hooks/useSiteCampaign';
 import FestiveCountdown from './festive/FestiveCountdown';
 import SectionDecor from './festive/SectionDecor';
 import ComboBuilderSheet from './ComboBuilderSheet';
+
 import { recordOfferInterest } from '../utils/offerInterest';
 import MysteryGiftArt from './offers/MysteryGiftArt';
 
@@ -248,16 +249,16 @@ const buyCount = (combo) => (combo.builder?.combos?.[0]?.slots || [])
   .filter((s) => s.options?.length === 1 && s.options[0].productId === combo.primaryProductId).length;
 
 const Thumb = ({ img, children, reward = false }) => (
-  <span className={`relative block aspect-square w-[40%] shrink-0 overflow-hidden bg-white ${reward ? 'border border-dashed border-ink/40' : 'border border-hair'}`}>
+  <span className={`relative block aspect-[4/5] w-[42%] shrink-0 ${(img) ? '' : `overflow-hidden rounded-2xl bg-white shadow-sm ${reward ? 'ring-2 ring-dashed ring-brand/40' : ''}`}`}>
     {img
-      ? <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+      ? <img src={(img) || img} alt="" loading="lazy" decoding="async" className={`h-full w-full ${(img) ? 'object-contain drop-shadow-[0_10px_12px_rgba(0,0,0,.25)]' : 'object-cover'}`} onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
       : <MysteryGiftArt className="absolute inset-0" />}
     {children}
   </span>
 );
 
 const Badge = ({ children }) => (
-  <span className="gl-lbl absolute inset-x-0 top-0 bg-sale py-[3px] text-center text-[8.5px] text-white">{children}</span>
+  <span className="absolute left-1.5 top-1.5 rounded-full bg-sale px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">{children}</span>
 );
 
 /**
@@ -282,7 +283,7 @@ const OfferRow = ({ combo }) => {
   const sameThing = rewardImg && rewardImg === buyImg;
   const title = combo.tagline || combo.title;
   const benefit = combo.benefit || '';
-  const qtyChip = qty > 1 && <span className="gl-lbl absolute bottom-1 left-1 bg-ink px-1.5 py-[2px] text-[9px] text-paper">×{qty}</span>;
+  const qtyChip = qty > 1 && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-paper">×{qty}</span>;
   return (
     <button
       type="button"
@@ -291,26 +292,26 @@ const OfferRow = ({ combo }) => {
         recordOfferInterest(combo.id, combo.primaryProductId);
         navigate(`/products/${combo.primaryProductId}`);
       }}
-      className="group flex h-full w-full flex-col overflow-hidden border border-hair bg-white text-left transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      style={{ borderRadius: 26 }} className="group flex h-full w-full flex-col overflow-hidden border-[3px] border-ink bg-cream p-2 text-left shadow-[5px_5px_0_rgb(var(--gl-ink))] transition-transform duration-300 hover:-translate-y-1 hover:-rotate-1 motion-reduce:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       aria-label={benefit ? `${title}. ${benefit}` : title}
     >
-      <span className="flex aspect-[16/10] w-full items-center justify-center gap-2 bg-paper px-3" aria-hidden="true">
+      <span style={{ borderRadius: 18 }} className="flex aspect-[16/11] w-full items-center justify-center gap-2 bg-white px-3" aria-hidden="true">
         {sameThing ? (
           <Thumb img={buyImg}>{badge && <Badge>{badge}</Badge>}{qtyChip}</Thumb>
         ) : (
           <>
             <Thumb img={buyImg}>{qtyChip}</Thumb>
-            <span className="text-[18px] font-extrabold leading-none text-ink/60">+</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[16px] font-extrabold leading-none text-brand shadow-sm">+</span>
             <Thumb img={rewardImg} reward>{badge && <Badge>{badge}</Badge>}</Thumb>
           </>
         )}
       </span>
-      <span className="flex flex-1 flex-col p-3 sm:p-3.5">
-        {benefit && <span className="gl-lbl text-[10px] leading-snug text-sale line-clamp-2">{benefit}</span>}
-        <span className="mt-1 min-h-[2.5em] font-bold text-[14px] leading-snug text-ink line-clamp-2 sm:text-[15px]">{title}</span>
-        <span className="mt-auto flex items-center justify-between gap-2 border-t border-hair pt-2.5">
-          <span className="text-[12px] font-semibold text-ink">Get this deal</span>
-          <span className="grid h-7 w-7 shrink-0 place-items-center bg-brand text-white transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">
+      <span className="flex flex-1 flex-col px-2 pb-1.5 pt-3">
+        {benefit && <span style={{ borderRadius: 999 }} className="self-start border-2 border-ink bg-mustard px-2.5 py-1 font-anton uppercase text-[13px] leading-tight text-ink">{benefit}</span>}
+        <span className="mt-2 font-anton uppercase text-[18px] leading-tight text-ink sm:text-[20px]">{title}</span>
+        <span className="mt-auto flex items-center justify-between gap-2 pt-3">
+          <span className="text-[13px] font-semibold text-ink">Get this deal</span>
+          <span style={{ borderRadius: 999 }} className="grid h-10 w-10 shrink-0 place-items-center bg-ink text-white transition-colors duration-200 group-hover:bg-brand" aria-hidden="true">
             <Arrow />
           </span>
         </span>
@@ -339,7 +340,7 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
 
   return (
     <div className="relative">
-      <section className="un-offers relative overflow-hidden bg-ink pb-9 pt-12 sm:pb-12 sm:pt-14" aria-label={heading}>
+      <section className="un-offers relative overflow-hidden pb-12 pt-12 sm:pb-20 sm:pt-16" aria-label={heading}>
         {festive && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
             <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.22), transparent 70%)' }} />
@@ -353,11 +354,9 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
         <div className="relative z-10 mx-auto max-w-[1240px] px-4 text-left sm:px-6">
           {/* left-aligned on the same line as the cards, like the other home sections */}
           <div className="mb-1 sm:mb-2">
-            <span className="inline-flex items-center gap-2 gl-lbl text-[11px] text-star tracking-[0.18em]">
-              <span aria-hidden="true">✦</span> {eyebrow}
-            </span>
-            <h2 className="mt-1.5 font-archivo text-[26px] font-extrabold leading-tight text-paper sm:text-4xl">{heading}</h2>
-            {sub && <p className="mt-2 max-w-xl text-sm text-paper/70 sm:text-base">{sub}</p>}
+            <span style={{ borderRadius: 999 }} className="inline-block -rotate-6 border-[3px] border-ink bg-brand px-4 py-1.5 font-anton uppercase leading-none text-white text-sm sm:text-lg shadow-[3px_3px_0_rgb(var(--gl-ink))]">{eyebrow}</span>
+            <h2 className="mt-3 font-anton uppercase leading-[.85] text-ink text-[clamp(3rem,9vw,7rem)]">{heading}</h2>
+            {sub && <p className="mt-2 max-w-xl text-sm text-ink/75 sm:text-base">{sub}</p>}
             {festive && <div className="mt-3 flex"><FestiveCountdown tone="light" /></div>}
           </div>
         </div>
@@ -366,7 +365,7 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
         {/* a swipe row on a phone (1.5 cards in view), every offer side by side on
             desktop - the same pattern as "More to explore" */}
         <div className="relative z-10 mx-auto mt-5 max-w-[1240px] sm:mt-6">
-          <div className="flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 gl-hscroll sm:scroll-px-6 sm:gap-4 sm:px-6 lg:justify-center">
+          <div className="flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pt-2 pb-3 gl-hscroll sm:scroll-px-6 sm:gap-4 sm:px-6 lg:justify-center">
             {combos.map((c) => (
               <div key={c.id} className="shrink-0 snap-start basis-[64vw] max-w-[260px] sm:basis-[calc((100%_-_2*16px)/3)] lg:basis-[calc((100%_-_4*16px)/5)] lg:max-w-[232px]">
                 <OfferRow combo={c} />

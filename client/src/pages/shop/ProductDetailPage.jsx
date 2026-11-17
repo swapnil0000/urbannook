@@ -14,8 +14,6 @@ import NotifyMeModal from '../../component/NotifyMeModal';
 import ComparisonTable from '../../component/ComparisonTable';
 import ImageCarousel from '../../component/ImageCarousel';
 import CommunityShots from '../../component/CommunityShots';
-import { motion, AnimatePresence } from 'motion/react';
-import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery, useGetHomeComboOffersQuery, useGetProductPromotionsQuery } from '../../store/api/userApi';
@@ -43,7 +41,6 @@ import { nounOf } from '../../utils/offerName';
 const variantLabel = (name = '') => (/figure|statue/i.test(name) ? 'Figure' : nounOf(name).replace(/^LED\s+/i, ''));
 import ProductQuestions from '../../component/support/ProductQuestions';
 
-const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
@@ -692,12 +689,12 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div ref={pageRef} className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
+    <div ref={pageRef} className="font-inter bg-cream text-ink min-h-screen overflow-x-clip">
       <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
-        <div className="text-sm text-faint mb-5 pt-6 md:pt-4">{/* clears the hanging Diwali lights */}
+        <div className="text-sm text-ink/60 mb-5 pt-2 md:pt-4">{/* clears the hanging Diwali lights */}
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / {variantCrumb
             ? <><Link to={`/product/${product.productId}`} className="hover:text-brand">{product.productName}</Link> / <span className="text-ink">{variantCrumb}</span></>
             : <span className="text-ink">{product.productName}</span>}
@@ -713,7 +710,7 @@ const ProductDetailPage = () => {
           <div className="min-w-0">
             {/* ZONE A - IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
             <div className="flex items-center justify-between gap-3">
-              <p className="gl-lbl text-ink border border-ink/25 px-3 py-1.5">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
+              <p className="-rotate-3 rounded-full border-2 border-ink bg-lime px-3 py-1 font-anton uppercase text-sm text-forest shadow-[2px_2px_0_rgb(var(--gl-ink))]">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
               {totalReviews > 0 && avgRating > 0 && (
                 <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
                   <Stars n={avgRating} className="text-xs" />
@@ -728,7 +725,7 @@ const ProductDetailPage = () => {
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
-                <h1 className="text-[26px] md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
+                <h1 className="font-anton uppercase text-[clamp(2rem,8vw,3.6rem)] text-ink leading-[.92] break-words">
                   {heading}
                 </h1>
                 {heading !== (selectedVariant || product.productName) && selectedVariant && (
@@ -763,10 +760,10 @@ const ProductDetailPage = () => {
                 Zone A's title/kicker above it, which sit with no padding of
                 their own - everything below looked shifted right instead of
                 lining up to the same left edge. Vertical spacing is kept. */}
-            <div className="mt-1  bg-paper  md:max-w-md">
+            <div className="mt-3 md:max-w-md">
               {/* price hero */}
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
+                <span className="font-anton text-5xl md:text-6xl text-brand tabular-nums leading-none [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">{inr(currentPrice)}</span>
                 {discountPercent > 0 && <span className="text-base md:text-lg text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
                 {discountPercent > 0 && <span className="rounded-full bg-sale px-2.5 py-1 text-[12px] font-extrabold leading-none text-white">{discountPercent}% OFF</span>}
                 <SaleTag />
@@ -805,7 +802,7 @@ const ProductDetailPage = () => {
                     <div>
                       <p className="font-archivo text-[14px] font-bold text-ink">{activeVariants.some((v) => v.variantSwatchType === 'color') ? 'Colour' : variantLabel(product.productName)}: <span className="font-semibold text-ink/70">{shortNames.get(selectedVariant) || selectedVariant}</span></p>
                       {/* one swipeable row (in stock first, sold out after) instead of a wall of pills */}
-                      <ScrollRow className="mt-2.5" fade="from-paper" activeKey={selectedVariant}>
+                      <ScrollRow className="mt-2.5" fade="from-cream" activeKey={selectedVariant}>
                         {[...activeVariants].sort((a, b) => Number(isVariantOutOfStock(a)) - Number(isVariantOutOfStock(b))).map((v) => {
                           const on = v.variantName === selectedVariant;
                           const oos = isVariantOutOfStock(v);
@@ -814,8 +811,9 @@ const ProductDetailPage = () => {
                               to={v.sku ? `/product/${product.productId}/${v.sku}` : `/product/${product.productId}`}
                               onClick={(e) => { e.preventDefault(); onSelectVariant(v); }}
                               aria-current={on ? 'true' : undefined} title={v.variantName}
-                              className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 font-archivo text-[13px] leading-none transition-colors ${on ? 'border-ink bg-ink font-bold text-paper' : 'border-hair bg-white font-semibold text-ink hover:border-ink'} ${oos ? 'text-muted line-through' : ''}`}>
-                              {shortNames.get(v.variantName) || v.variantName}
+                              className={`shrink-0 inline-flex items-center min-h-[44px] max-w-[220px] px-4 my-1.5 rounded-full border-[3px] font-anton uppercase tracking-wide text-[15px] leading-none whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand ${on ? 'bg-ink text-lime border-ink' : 'bg-white text-ink border-ink hover:bg-lime'} ${oos ? 'opacity-50 line-through' : ''}`}>
+                              {/* name only - no photo, the big gallery above already shows the design */}
+                              <span className="truncate">{shortNames.get(v.variantName) || v.variantName}</span>
                             </Link>
                           );
                         })}
@@ -847,25 +845,25 @@ const ProductDetailPage = () => {
                 {isOutOfStock ? (
                   <button
                     onClick={() => setShowNotifyModal(true)}
-                    className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors flex items-center justify-center gap-2"
+                    className="gl-press flex-1 h-14 border-[3px] border-ink bg-white text-ink font-anton uppercase tracking-wide text-lg rounded-full hover:bg-lime transition-colors flex items-center justify-center gap-2"
                   >
                     <i className="fa-regular fa-bell text-xs" /> Notify me when back
                   </button>
                 ) : isInCart ? (
                   <>
-                    <div className="flex items-center border border-ink rounded-xl h-12 shrink-0">
+                    <div className="flex items-center border-[3px] border-ink bg-white rounded-full h-14 shrink-0 px-1">
                       <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="w-10 h-full text-lg">−</button>
                       <span className="w-8 text-center font-bold">{currentCartQty}</span>
                       <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="w-10 h-full text-lg">+</button>
                     </div>
-                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">View offers & checkout</button>
+                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-14 bg-brand text-white font-anton uppercase tracking-wide text-lg rounded-full border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow]">View offers & checkout</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 whitespace-nowrap">
+                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="gl-press flex-1 h-14 border-[3px] border-ink bg-white text-ink font-anton uppercase tracking-wide text-lg rounded-full hover:bg-lime transition-colors disabled:opacity-60 whitespace-nowrap">
                       Add to Cart
                     </button>
-                    <button onClick={handleBuyNow} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
+                    <button onClick={handleBuyNow} disabled={isAdding} className="gl-press flex-1 h-14 bg-brand text-white font-anton uppercase tracking-wide text-lg rounded-full border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow] disabled:opacity-60 whitespace-nowrap">
                       {isAdding ? 'Please wait…' : 'Buy Now'}
                     </button>
                   </>
@@ -1071,7 +1069,7 @@ const ProductDetailPage = () => {
 
         {/* IN THE WILD - full-bleed BLACK (ink) editorial band from customer review photos */}
         {communityShots.length > 0 && (
-          <ScrollColorBand nightScopeRef={pageRef} className="w-screen ml-[calc(50%-50vw)] mt-16">
+          <section className="w-screen ml-[calc(50%-50vw)] mt-16 bg-forest text-lime">
             <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
               <p className="gl-lbl opacity-50 mb-2">- In the wild</p>
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
@@ -1080,7 +1078,7 @@ const ProductDetailPage = () => {
               <p className="opacity-60 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
               <CommunityShots shots={communityShots} onImgErr={onImgErr} onOpen={(i) => setLightbox({ list: communityShotUrls, idx: i })} />
             </div>
-          </ScrollColorBand>
+          </section>
         )}
 
         {/* WHY URBAN NOOK - comparison table (ComparisonTable.jsx). Same
@@ -1233,20 +1231,17 @@ const ProductDetailPage = () => {
       </div>
 
       {/* sticky Add-to-Cart bar (mobile above the bottom nav, desktop at the very bottom) - appears after the main CTA scrolls out of view */}
-      <AnimatePresence>
-        {!buyBoxVisible && product && !isLoading && (
-          <MotionDiv
-            initial={{ y: 90, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 90, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            data-sticky-buybar="all" // the floating Help button lifts above this bar while it is shown ("all" = desktop too)
-            className="fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]"
+      {product && !isLoading && (
+          <div
+            aria-hidden={buyBoxVisible || undefined}
+            inert={buyBoxVisible || undefined}
+            data-sticky-buybar={buyBoxVisible ? undefined : 'all'} // the floating Help button lifts above this bar while it is shown ("all" = desktop too)
+            className={`fixed inset-x-0 z-30 bg-cream border-t-[3px] border-ink px-4 py-3 flex items-center gap-3 transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none ${buyBoxVisible ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'} bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]`}
           >
             {/* the thumbnail is the first thing to go once the bar also has to
                 hold a stepper - at 390px there is not room for both */}
             {!isInCart && (
-              <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
+              <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-full object-contain bg-white border-2 border-ink shrink-0" onError={onImgErr} />
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs md:text-sm font-bold truncate leading-tight">{product.productName}</p>
@@ -1265,7 +1260,7 @@ const ProductDetailPage = () => {
                 {/* Same handleUpdateQty the main buy box uses, so the cart API
                     call (and the guest-cart dispatch) stays in one place -
                     this bar only adds a second way to reach it. */}
-                <div className="flex items-center border border-ink rounded-xl h-11 shrink-0">
+                <div className="flex items-center border-2 border-ink bg-white rounded-full h-11 shrink-0">
                   <button
                     onClick={() => handleUpdateQty(currentCartQty - 1)}
                     aria-label={currentCartQty > 1 ? 'Decrease quantity' : 'Remove from cart'}
@@ -1282,18 +1277,17 @@ const ProductDetailPage = () => {
                     +
                   </button>
                 </div>
-                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Offers & checkout</button>
+                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-anton uppercase tracking-wide text-[15px] px-4 h-11 rounded-full border-2 border-ink shrink-0">Offers & checkout</button>
               </>
             ) : (
               <>
                 {/* desktop has the room for both buttons, like the main buy box */}
-                <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="hidden md:block gl-press border border-ink text-ink font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors disabled:opacity-60">Add to Cart</button>
-                <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
+                <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="hidden md:block gl-press border-2 border-ink bg-white text-ink font-anton uppercase tracking-wide text-[15px] px-6 h-11 rounded-full shrink-0 hover:bg-lime transition-colors disabled:opacity-60">Add to Cart</button>
+                <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-anton uppercase tracking-wide text-[15px] px-6 h-11 rounded-full border-2 border-ink shadow-[3px_3px_0_rgb(var(--gl-ink))] shrink-0 disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
               </>
             )}
-          </MotionDiv>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
 
       {/* out-of-stock notify-me */}
       {showNotifyModal && (
@@ -1321,6 +1315,6 @@ const ProductDetailPage = () => {
 };
 
 // MotionRoot: reduced-motion setting for this page's animations (component/motion).
-const ProductDetailPageWithMotion = () => <MotionRoot><ProductDetailPage /></MotionRoot>;
+const ProductDetailPageWithMotion = ProductDetailPage;
 
 export default ProductDetailPageWithMotion;

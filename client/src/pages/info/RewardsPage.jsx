@@ -48,7 +48,7 @@ const RewardsPage = () => {
               <i className="fa-solid fa-gift text-2xl"></i>
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Rewards Program</h1>
+              <h1 className="text-2xl font-anton uppercase leading-[.95] text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">Rewards Program</h1>
               <p className="text-amber-100">Earn points with every purchase</p>
             </div>
           </div>
@@ -59,38 +59,32 @@ const RewardsPage = () => {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-3xl font-bold text-amber-600 mb-2">{userPoints.toLocaleString()}</div>
-              <div className="text-gray-600">Available Points</div>
+              <div className="text-ink/70">Available Points</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-emerald-600 mb-2">₹{Math.floor(userPoints / 10)}</div>
-              <div className="text-gray-600">Reward Value</div>
+              <div className="text-ink/70">Reward Value</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-600 mb-2">Gold</div>
-              <div className="text-gray-600">Member Status</div>
+              <div className="text-ink/70">Member Status</div>
             </div>
           </div>
         </div>
 
         {/* Available Rewards */}
         <div className="p-6">
-          <h2 className="text-xl font-semibold mb-6">Available Rewards</h2>
+          <h2 className="text-xl font-semibold mb-6 font-anton uppercase leading-[.95]">Available Rewards</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {rewards.map((reward) => (
-              <div key={reward.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+              <div key={reward.id} className="border-[3px] border-ink rounded-[24px] p-6 hover:shadow-md transition-shadow shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                 <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    reward.type === 'discount' ? 'bg-green-100' :
-                    reward.type === 'shipping' ? 'bg-blue-100' : 'bg-purple-100'
-                  }`}>
-                    <i className={`fa-solid ${getRewardIcon(reward.type)} ${
-                      reward.type === 'discount' ? 'text-green-600' :
-                      reward.type === 'shipping' ? 'text-blue-600' : 'text-purple-600'
-                    }`}></i>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${ reward.type === 'discount' ? 'bg-green-100' : reward.type === 'shipping' ? 'bg-blue-100' : 'bg-purple-100' }`}>
+                    <i className={`fa-solid ${getRewardIcon(reward.type)} ${ reward.type === 'discount' ? 'text-green-600' : reward.type === 'shipping' ? 'text-blue-600' : 'text-purple-600' }`}></i>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{reward.title}</h3>
-                    <p className="text-sm text-gray-600">{reward.description}</p>
+                    <h3 className="font-semibold text-ink font-anton uppercase leading-[.95]">{reward.title}</h3>
+                    <p className="text-sm text-ink/70">{reward.description}</p>
                   </div>
                 </div>
                 
@@ -101,11 +95,7 @@ const RewardsPage = () => {
                   <button
                     onClick={() => redeemReward(reward)}
                     disabled={userPoints < reward.points}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      userPoints >= reward.points
-                        ? 'bg-amber-600 text-white hover:bg-amber-700'
-                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    }`}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${ userPoints >= reward.points ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-gray-200 text-ink/70 cursor-not-allowed' }`}
                   >
                     {userPoints >= reward.points ? 'Redeem' : 'Not Enough Points'}
                   </button>
@@ -116,24 +106,18 @@ const RewardsPage = () => {
 
           {/* Points History */}
           <div>
-            <h2 className="text-xl font-semibold mb-6">Points History</h2>
-            <div className="bg-gray-50 rounded-xl p-6">
+            <h2 className="text-xl font-semibold mb-6 font-anton uppercase leading-[.95]">Points History</h2>
+            <div className="bg-cream rounded-xl p-6">
               <div className="space-y-4">
                 {rewardHistory.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
+                  <div key={index} className="flex items-center justify-between py-3 border-b border-ink/15 last:border-b-0">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.action === 'Purchase' ? 'bg-green-100' :
-                        item.action === 'Review' ? 'bg-blue-100' : 'bg-purple-100'
-                      }`}>
-                        <i className={`fa-solid ${
-                          item.action === 'Purchase' ? 'fa-shopping-cart text-green-600' :
-                          item.action === 'Review' ? 'fa-star text-blue-600' : 'fa-user-plus text-purple-600'
-                        } text-sm`}></i>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${ item.action === 'Purchase' ? 'bg-green-100' : item.action === 'Review' ? 'bg-blue-100' : 'bg-purple-100' }`}>
+                        <i className={`fa-solid ${ item.action === 'Purchase' ? 'fa-shopping-cart text-green-600' : item.action === 'Review' ? 'fa-star text-blue-600' : 'fa-user-plus text-purple-600' } text-sm`}></i>
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">{item.description}</div>
-                        <div className="text-sm text-gray-500">{new Date(item.date).toLocaleDateString()}</div>
+                        <div className="font-medium text-ink">{item.description}</div>
+                        <div className="text-sm text-ink/70">{new Date(item.date).toLocaleDateString()}</div>
                       </div>
                     </div>
                     <div className="text-amber-600 font-semibold">+{item.points} pts</div>
@@ -145,7 +129,7 @@ const RewardsPage = () => {
 
           {/* How to Earn Points */}
           <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-4">How to Earn More Points</h3>
+            <h3 className="text-lg font-semibold mb-4 font-anton uppercase leading-[.95]">How to Earn More Points</h3>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
                 <i className="fa-solid fa-shopping-cart text-amber-600"></i>

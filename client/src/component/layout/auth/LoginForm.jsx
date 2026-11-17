@@ -216,7 +216,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
 
       {/* Bottom-sheet on mobile, centered dialog on desktop */}
       <div
-        className="bg-paper w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row auth-sheet max-h-[94dvh] md:h-[650px]"
+        className="bg-cream w-full max-w-4xl border-[3px] border-ink shadow-[10px_10px_0_rgb(var(--gl-ink))] relative overflow-hidden flex flex-col md:flex-row auth-sheet max-h-[94dvh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile grab handle */}
@@ -225,21 +225,20 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         </div>
 
         {/* --- LEFT SIDE (Visual) --- */}
-        <div className="hidden md:flex w-5/12 bg-ink p-10 flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex w-5/12 bg-forest p-10 flex-col justify-between relative overflow-hidden">
             {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
             
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-10">
                     {/* <div className="w-10 h-10 bg-save rounded-xl flex items-center justify-center text-white">
                         <i className="fa-solid fa-leaf text-lg"></i>
                     </div> */}
-                    <span className="text-white font-archivo text-xl">UrbanNook</span>
+                    <span className="font-anton uppercase text-3xl text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">UrbanNook</span>
                 </div>
                 
-                <h2 className="text-4xl font-archivo text-white mb-6 leading-tight">
+                <h2 className="font-anton uppercase text-6xl text-lime mb-6 leading-[.9]">
                     Welcome <br/>
-                    <span className="italic text-surface">Back.</span>
+                    <span className="text-mustard">Back.</span>
                 </h2>
                 
                 <p className="text-gray-300 text-sm leading-relaxed max-w-xs">
@@ -251,8 +250,10 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
             <div className="relative z-10 p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
                     <div className="flex -space-x-3">
-                        {[1,2,3].map(i => (
-                            <div key={i} className="w-8 h-8 rounded-full bg-ink border-2 border-ink"></div>
+                        {['bg-lime text-forest', 'bg-mustard text-ink', 'bg-brand text-white'].map((tone) => (
+                            <span key={tone} aria-hidden="true" className={`w-8 h-8 rounded-full border-2 border-forest grid place-items-center ${tone}`}>
+                                <i className="fa-solid fa-user text-[12px]" />
+                            </span>
                         ))}
                     </div>
                     <div>
@@ -264,9 +265,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         </div>
 
         {/* --- RIGHT SIDE (Form) --- */}
-        <div className="un-scroll w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
+        <div className="w-full md:w-7/12 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6 py-10 sm:px-8 md:px-12 md:py-10 relative flex flex-col">
           <button 
-            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
+            className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center rounded-full border-2 border-ink bg-white text-ink hover:bg-ink hover:text-lime transition-colors z-20"
             onClick={() => {
               dispatch(setShowLoginModal(false));
               onClose();
@@ -275,9 +276,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
             <i className="fa-solid fa-xmark"></i>
           </button>
 
-          <div className="max-w-md mx-auto w-full">
+          <div className="max-w-md mx-auto w-full my-auto">
             <div className="mb-8 text-center md:text-left">
-              <h2 className="text-3xl font-archivo text-ink mb-2">Sign In</h2>
+              <h2 className="font-anton uppercase text-5xl text-brand mb-2 leading-none">Sign In</h2>
               <p className="text-gray-500 text-sm">Continue to your curated space.</p>
             </div>
 
@@ -353,7 +354,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full py-4 bg-brand text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-brandHi transition-all shadow-xl active:scale-[0.98] mt-6 disabled:opacity-50 text-xs"
+                className="w-full py-4 bg-brand text-white rounded-full border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton uppercase tracking-wide text-lg hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow] mt-6 disabled:opacity-50"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">

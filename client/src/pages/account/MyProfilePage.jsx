@@ -184,7 +184,7 @@ const MyProfilePage = () => {
   ];
 
   return (
-    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
+    <div className="bg-cream min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
 
       {/* --- AMBIENT BACKGROUND --- */}
       <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
@@ -205,19 +205,15 @@ const MyProfilePage = () => {
                  <span className="h-[1px] w-8 bg-brand"></span>
                  <span className="gl-lbl text-brand text-[10px]">Profile</span>
              </div>
-             <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
-               Your <span className="text-brand ">Sanctuary.</span>
+             <h1 className="text-4xl md:text-5xl lg:text-6xl leading-tight font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
+               Your <span className="text-brand">Sanctuary.</span>
              </h1>
            </div>
            
            <button 
              onClick={() => isEditing ? handleSave() : setIsEditing(true)}
              disabled={updating}
-             className={`px-6 md:px-8 py-2.5 md:py-3 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg active:scale-95 flex items-center justify-center gap-2 w-full md:w-auto ${
-               isEditing
-                 ? 'bg-brand text-white hover:bg-ink'
-                 : 'bg-surface border border-hair text-ink hover:bg-brand hover:text-white hover:border-brand'
-             } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+             className={`px-6 md:px-8 py-2.5 md:py-3 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg active:scale-95 flex items-center justify-center gap-2 w-full md:w-auto ${ isEditing ? 'bg-brand text-white hover:bg-ink' : 'bg-cream border border-ink/15 text-ink hover:bg-brand hover:text-white hover:border-brand' } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
            >
              {updating ? (
                <>
@@ -239,7 +235,7 @@ const MyProfilePage = () => {
         {/* --- PROFILE LAYOUT --- */}
         <div className="grid grid-cols-1 gap-6">
 
-          {/* Passkey enrollment — enable Face ID / fingerprint sign-in */}
+          {/* Passkey enrollment - enable Face ID / fingerprint sign-in */}
           <PasskeyEnroll />
 
           {/* Personal Info Grid */}
@@ -247,9 +243,7 @@ const MyProfilePage = () => {
             {profileFields.map((field, idx) => (
               <div 
                 key={idx} 
-                className={`bg-surface rounded-[24px] p-5 md:p-6 border border-transparent shadow-md hover:shadow-lg transition-all duration-300 group ${
-                  field.fullWidth ? 'md:col-span-2' : ''
-                }`}
+                className={`bg-cream rounded-[24px] p-5 md:p-6 border-[3px] border-transparent hover:shadow-lg transition-all duration-300 group shadow-[4px_4px_0_rgb(var(--gl-ink))] ${ field.fullWidth ? 'md:col-span-2' : '' }`}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
@@ -266,7 +260,7 @@ const MyProfilePage = () => {
                         name={field.name}
                         value={field.value}
                         onChange={handleInputChange}
-                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink resize-none placeholder-gray-400 shadow-inner"
+                        className="w-full p-4 bg-white border-2 border-ink rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink resize-none placeholder-gray-400 shadow-inner rounded-2xl"
                         rows="3"
                       />
                     ) : (
@@ -276,13 +270,13 @@ const MyProfilePage = () => {
                         value={field.value}
                         onChange={handleInputChange}
                         placeholder={field.name === 'userMobileNumber' ? '10-digit mobile number' : ''}
-                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink placeholder-gray-400 shadow-inner"
+                        className="w-full p-4 bg-white border-2 border-ink rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink placeholder-gray-400 shadow-inner rounded-2xl min-h-[48px]"
                       />
                     )
                   ) : (
                     <div className="min-h-[2.5rem] flex items-center">
                       <p className={`font-archivo text-base md:text-lg text-ink ${field.name === 'userEmail' ? 'truncate' : ''}`}>
-                        {field.value || <span className="text-gray-400 text-sm italic">Not set</span>}
+                        {field.value || <span className="text-ink/60 text-sm italic">Not set</span>}
                       </p>
                     </div>
                   )}

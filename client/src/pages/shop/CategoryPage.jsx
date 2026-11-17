@@ -133,8 +133,20 @@ const CategoryPage = () => {
     },
   ];
 
+  // products with several designs here -> link to their circle-ring page (/products/:id)
+  const groups = (() => {
+    const m = new Map();
+    for (const { p } of allItems) {
+      if (!p?.productId) continue;
+      const g = m.get(p.productId) || { id: p.productId, name: p.productName, img: (p.variantDetails?.[0]?.variantImage || [])[0] || p.productImg, count: 0 };
+      g.count += 1;
+      m.set(p.productId, g);
+    }
+    return [...m.values()].filter((g) => g.count > 1);
+  })();
+
   return (
-    <div className="font-inter bg-surface text-ink min-h-screen">
+    <div className="font-inter bg-cream text-ink min-h-screen overflow-x-clip">
       <SEOHead
         title={page > 1 ? `${title} - Page ${page}` : title}
         description={description}
@@ -145,25 +157,38 @@ const CategoryPage = () => {
         structuredData={structuredData}
       />
 
-      <div className="max-w-[1280px] mx-auto px-5 pt-10">
-        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
+      <div className="max-w-[1280px] mx-auto px-5 pt-6 md:pt-10">
+        <nav aria-label="Breadcrumb" className="text-sm text-ink/60 mb-4 pt-2">
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
         <SaleBanner className="mb-5" />
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
-        <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
+        <h1 className="font-anton uppercase text-brand text-[clamp(2.6rem,10vw,6rem)] leading-[.88] [text-shadow:3px_3px_0_rgb(var(--gl-ink))] break-words">{copy.h1}</h1>
+        <p className="text-ink/70 mt-3">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
 
         {pills.length > 0 && (
           <ScrollRow className="mt-6" activeKey={slug}>
-              <Link to="/products" className="gl-press px-4 py-2 rounded-full text-sm font-semibold bg-white border border-hair hover:border-ink">All</Link>
+              <Link to="/products" className="gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors bg-white text-ink border-ink hover:bg-lime">All</Link>
               {/* same fixed order as Shop All; the current one is highlighted in place */}
               {pills.map((c) => (
                 <Link key={c.slug} to={`/category/${c.slug}`} aria-current={c.slug === slug ? 'page' : undefined}
-                  className={`gl-press px-4 py-2 rounded-full text-sm font-semibold border ${c.slug === slug ? 'bg-brand text-white border-brand' : 'bg-white border-hair hover:border-ink'}`}>{CATEGORY_LABEL[c.name] || c.name}</Link>
+                  className={`gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors ${c.slug === slug ? 'bg-forest text-lime border-forest' : 'bg-white text-ink border-ink hover:bg-lime'}`}>{CATEGORY_LABEL[c.name] || c.name}</Link>
               ))}
           </ScrollRow>
+        )}
+        {groups.length > 0 && (
+          <div className="mt-6 rounded-[24px] border-[3px] border-ink bg-lime p-4 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+            <p className="font-anton uppercase text-forest text-xl leading-none">See every design together</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {groups.map((g) => (
+                <Link key={g.id} to={`/products/${g.id}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-full border-2 border-ink bg-white pl-1.5 pr-4 font-semibold text-[14px] text-ink hover:bg-mustard transition-colors">
+                  {g.img && <img src={g.img} alt="" loading="lazy" decoding="async" className="w-8 h-8 rounded-full object-contain bg-cream border border-ink/20" />}
+                  {g.name}<span className="rounded-full bg-forest text-lime px-1.5 text-[11px] font-bold">{g.count}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -177,7 +202,7 @@ const CategoryPage = () => {
         </div>
         <ActiveFilterChips filters={filters} setFilters={setFilters} />
         {items.length === 0 && (
-          <div className="text-center py-20 border border-hair bg-white">
+          <div className="text-center py-20 rounded-[24px] border-[3px] border-ink bg-white">
             <p className="font-extrabold text-lg">No products match these filters</p>
             <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="mt-3 text-sm font-bold text-brand hover:underline">Clear filters</button>
           </div>
@@ -203,13 +228,13 @@ const CategoryPage = () => {
 
         {totalPages > 1 && (
           <nav aria-label="Pagination" className="flex items-center justify-center gap-2 mt-10">
-            {page > 1 && <Link to={pagePath(page - 1)} rel="prev" className="px-4 py-2 border border-hair rounded-lg text-sm font-semibold hover:border-ink">Previous</Link>}
+            {page > 1 && <Link to={pagePath(page - 1)} rel="prev" className="gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors bg-white text-ink border-ink hover:bg-lime">Previous</Link>}
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
               n === page
-                ? <span key={n} aria-current="page" className="px-3.5 py-2 rounded-lg text-sm font-bold bg-ink text-white">{n}</span>
-                : <Link key={n} to={pagePath(n)} className="px-3.5 py-2 border border-hair rounded-lg text-sm font-semibold hover:border-ink">{n}</Link>
+                ? <span key={n} aria-current="page" className="gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors bg-forest text-lime border-forest">{n}</span>
+                : <Link key={n} to={pagePath(n)} className="gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors bg-white text-ink border-ink hover:bg-lime">{n}</Link>
             ))}
-            {page < totalPages && <Link to={pagePath(page + 1)} rel="next" className="px-4 py-2 border border-hair rounded-lg text-sm font-semibold hover:border-ink">Next</Link>}
+            {page < totalPages && <Link to={pagePath(page + 1)} rel="next" className="gl-press inline-flex min-h-[44px] items-center px-4 rounded-full border-2 font-anton uppercase tracking-wide text-[15px] transition-colors bg-white text-ink border-ink hover:bg-lime">Next</Link>}
           </nav>
         )}
         </div>
@@ -218,12 +243,12 @@ const CategoryPage = () => {
       {stories.length > 0 && (
         <section className="max-w-[1280px] mx-auto px-5 pb-12" aria-labelledby="stories-heading">
           <div className="flex items-end justify-between gap-4 flex-wrap">
-            <h2 id="stories-heading" className="text-2xl md:text-3xl font-extrabold tracking-tight">The stories behind the swords</h2>
+            <h2 id="stories-heading" className="font-anton uppercase text-3xl md:text-5xl leading-none">The stories behind the swords</h2>
             <Link to={`/blog#${category.slug}`} className="text-sm font-bold text-brand hover:underline">All {name} stories →</Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-5">
             {stories.map((p) => (
-              <Link key={p.slug} to={`/blog/${p.slug}`} className="group bg-white border border-hair rounded-2xl overflow-hidden hover:border-ink transition-colors flex gap-4 p-3">
+              <Link key={p.slug} to={`/blog/${p.slug}`} className="group bg-white border-[3px] border-ink rounded-[22px] overflow-hidden shadow-[4px_4px_0_rgb(var(--gl-ink))] transition-transform hover:-translate-y-1 flex gap-4 p-3">
                 {p.coverImage && <img src={p.coverImage} alt={p.coverAlt || p.title} loading="lazy" className="w-24 h-24 object-cover rounded-xl shrink-0" />}
                 <span className="flex flex-col min-w-0">
                   <span className="font-extrabold leading-snug group-hover:text-brand line-clamp-2">{p.title}</span>

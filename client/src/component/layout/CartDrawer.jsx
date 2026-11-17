@@ -324,21 +324,21 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
       {/* Drawer Panel */}
       <div
-        className={`relative w-full max-w-[430px] bg-paper h-full shadow-2xl flex flex-col transform transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none will-change-transform ${
+        className={`relative w-full max-w-[430px] bg-cream border-l-[3px] border-ink h-full shadow-2xl flex flex-col transform transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none will-change-transform ${
           shown ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
 
         {/* --- HEADER --- */}
-        <div className="px-5 py-3 border-b border-hair flex items-center justify-between shrink-0">
+        <div className="px-5 py-3 border-b-[3px] border-ink bg-lime flex items-center justify-between shrink-0">
           <div className="flex items-baseline gap-2.5">
-            <h2 className="text-xl font-extrabold tracking-tight">Your Cart</h2>
-            <span className="gl-lbl text-brand text-[11px]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
+            <h2 className="font-anton uppercase text-3xl leading-none text-forest">Your Cart</h2>
+            <span className="rounded-full border-2 border-ink bg-mustard px-2 py-0.5 font-anton uppercase text-[13px] text-ink">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
           </div>
           <button
             onClick={onClose}
             aria-label="Close cart"
-            className="w-9 h-9 rounded-full border border-hair grid place-items-center text-muted hover:border-ink hover:text-ink transition-colors"
+            className="w-10 h-10 rounded-full border-2 border-ink bg-white grid place-items-center text-ink hover:bg-ink hover:text-lime transition-colors"
           >
             <i className="fa-solid fa-xmark text-sm" />
           </button>
@@ -353,12 +353,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <i className="fa-solid fa-bag-shopping text-2xl text-brand" />
               </div>
               <div>
-                <h3 className="text-lg font-extrabold mb-1">Your cart is empty</h3>
+                <h3 className="font-anton uppercase text-3xl mb-1">Your cart is empty</h3>
                 <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love - it'll show up here.</p>
               </div>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
-                className="gl-press bg-brand text-white text-sm font-bold px-7 py-3 rounded-xl hover:bg-brandHi transition-colors"
+                className="gl-press bg-brand text-white font-anton uppercase tracking-wide text-lg px-8 py-3 rounded-full border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow]"
               >
                 Start shopping
               </button>
@@ -459,7 +459,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               </div>}
               <button
                 onClick={handleCheckout}
-                className="gl-press relative z-0 w-full h-12 bg-ink text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
+                className="gl-press relative z-0 w-full h-14 bg-brand text-white rounded-full border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton uppercase tracking-wide text-lg hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow] flex items-center justify-center gap-2 px-6"
               >
                   <span>Proceed to Checkout</span>
                   <i className="fa-solid fa-arrow-right-long"></i>

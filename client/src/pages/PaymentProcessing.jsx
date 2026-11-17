@@ -127,11 +127,11 @@ const PaymentProcessing = () => {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="bg-white shadow-xl rounded-2xl p-10 flex flex-col items-center w-full max-w-md">
         <div className="w-16 h-16 border-4 border-brand/30 border-t-ink rounded-full animate-spin"></div>
-        <h2 className="mt-6 text-2xl font-semibold text-ink text-center">
+        <h2 className="mt-6 text-2xl font-semibold text-ink text-center font-anton uppercase leading-[.95]">
           Processing Payment
         </h2>
         <p className="mt-3 text-brand text-center">{message}</p>
-        <p className="mt-2 text-sm text-gray-500 text-center">
+        <p className="mt-2 text-sm text-ink/70 text-center">
           Please do not refresh or close this page.
         </p>
       </div>

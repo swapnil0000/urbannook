@@ -11,7 +11,7 @@ const Return = () => {
   const lastUpdated = "September 16, 2026";
 
   return (
-    <div className="bg-paper min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
+    <div className="bg-cream min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
       
       {/* --- BACKGROUND ELEMENTS --- */}
       {/* Large Watermark */}
@@ -28,16 +28,16 @@ const Return = () => {
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 md:py-28">
         
         {/* Header */}
-        <div className="mb-2 text-left  border-b border-hair pb-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-hair w-fit mb-6">
+        <div className="mb-2 text-left border-b border-ink/15 pb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cream border-[3px] border-ink w-fit mb-6 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
             <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
             <span className="gl-lbl text-[10px] text-brand">Policy</span>
           </div>
           
-          <h1 className="font-archivo text-4xl md:text-6xl font-extrabold text-ink mb-4 leading-[1.05] tracking-tight">
+          <h1 className="text-4xl md:text-6xl mb-4 leading-[1.05] font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
             Cancellation, Exchange &amp; <span className="text-brand">Refunds</span>
           </h1>
-          <p className="text-muted text-sm md:text-base">
+          <p className="text-ink/70 text-sm md:text-base">
             Last Updated: <span className="text-ink font-semibold">{lastUpdated}</span>
           </p>
         </div>
@@ -45,24 +45,24 @@ const Return = () => {
         {/* Content Blocks */}
         <div className="space-y-12">
 
-          {/* Key rule — shown first so it is read before anything else */}
+          {/* Key rule - shown first so it is read before anything else */}
           <div className="border-2 border-brand bg-brand/5 p-5 md:p-6">
             <p className="font-archivo text-lg md:text-xl font-bold text-ink">No returns. No change-of-mind exchanges.</p>
-            <p className="text-muted text-sm md:text-base mt-2">
+            <p className="text-ink/70 text-sm md:text-base mt-2">
               Replacement is only for items that arrive <strong className="text-ink font-semibold">damaged, defective or wrong</strong>, reported within <strong className="text-ink font-semibold">3 days of delivery</strong> with an unboxing video.
             </p>
           </div>
 
           {/* Section 1 */}
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl text-ink mb-4 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">01.</span> Order Cancellation
             </h2>
-            <p className="leading-relaxed text-muted mb-4">
+            <p className="leading-relaxed text-ink/70 mb-4">
               You may cancel your order at any time <strong className="text-ink font-semibold">before it has been dispatched</strong> from our warehouse. Once the shipping label is generated and the product leaves our facility, the order cannot be cancelled.
             </p>
-            <div className="bg-surface border border-hair p-6">
-              <p className="text-sm text-muted">
+            <div className="bg-cream border-[3px] border-ink p-6 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+              <p className="text-sm text-ink/70">
                 To cancel, please email <strong className="text-brand select-all">{SUPPORT_EMAIL}</strong> with your Order ID immediately.
               </p>
             </div>
@@ -70,13 +70,13 @@ const Return = () => {
 
           {/* Section 2 */}
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl text-ink mb-4 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">02.</span> Exchange Policy
             </h2>
-            <p className="leading-relaxed text-muted mb-4">
+            <p className="leading-relaxed text-ink/70 mb-4">
               At Urban Nook, we take pride in the quality of our craftsmanship. We do not accept returns. We offer a <strong className="text-ink font-semibold">3-day exchange policy</strong> applicable only for damaged, defective, or incorrect items. You may initiate a request within <strong className="text-ink font-semibold">3 days</strong> of receiving your order. Since our products are made-to-order or limited batch, we do not accept exchanges for <span className="font-bold text-brand">"change of mind"</span>.
             </p>
-            <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
+            <ul className="list-disc pl-5 space-y-2 text-ink/70 marker:text-brand">
               <li><strong className="text-ink font-semibold">Damaged/Defective:</strong> To claim an exchange for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
               <li><strong className="text-ink font-semibold">Wrong Item:</strong> If you receive the wrong item, please share an unboxing video clearly showing the package label within the specified time period for verification. Once confirmed, we will arrange a reverse pickup and send the correct item at no additional cost.</li>
             </ul>
@@ -84,13 +84,13 @@ const Return = () => {
 
           {/* Section 3 */}
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl text-ink mb-4 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">03.</span> Eligibility Criteria
             </h2>
-            <p className="leading-relaxed text-muted mb-4">
+            <p className="leading-relaxed text-ink/70 mb-4">
               To be eligible for an exchange, your item must meet the following conditions:
             </p>
-            <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
+            <ul className="list-disc pl-5 space-y-2 text-ink/70 marker:text-brand">
               <li>The item must be unused and in the same condition that you received it.</li>
               <li>It must be in the original packaging with all tags and protective covers intact.</li>
               <li>You must provide the receipt or proof of purchase.</li>
@@ -98,7 +98,7 @@ const Return = () => {
               <li>Items marked as "Final Sale" or "Clearance" are not eligible for exchange.</li>
             </ul>
             <p className="leading-relaxed text-ink font-semibold mt-6 mb-3">Claims we will reject:</p>
-            <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
+            <ul className="list-disc pl-5 space-y-2 text-ink/70 marker:text-brand">
               <li>Change of mind, "didn't like it", or ordered by mistake.</li>
               <li>Claims without an unboxing video, or with an edited or cut video.</li>
               <li>Claims reported after 3 days of delivery.</li>
@@ -108,41 +108,41 @@ const Return = () => {
           </section>
 
           {/* Section 4: Distinct Box for Damaged Goods */}
-          <section className="bg-surface border border-hair p-6">
-            <h2 className="font-archivo text-lg md:text-xl font-bold text-brand mb-2 flex items-center gap-3">
+          <section className="bg-cream border-[3px] border-ink p-6 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+            <h2 className="text-lg md:text-xl text-brand mb-2 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">04.</span> Damaged or Defective Items
             </h2>
-            <p className="leading-relaxed text-muted text-sm">
+            <p className="leading-relaxed text-ink/70 text-sm">
               Please inspect your order upon reception. If the item is defective, damaged, or if you receive the wrong item, contact us immediately within <strong className="text-ink font-semibold">3 days</strong> with unboxing photos/videos so that we can evaluate the issue and make it right.
             </p>
           </section>
 
           {/* Section 5 */}
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl text-ink mb-4 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">05.</span> Non-Exchangeable Items
             </h2>
-            <p className="leading-relaxed text-muted mb-4">
+            <p className="leading-relaxed text-ink/70 mb-4">
               Certain types of items cannot be exchanged due to their nature:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="bg-white p-4 rounded-none border border-hair">
-                  <h3 className="text-brand font-bold text-sm mb-1">Custom Orders</h3>
-                  <p className="text-xs text-muted">Personalized or 3D printed-to-order items.</p>
+               <div className="bg-white p-4 rounded-none border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+                  <h3 className="text-brand text-sm mb-1 font-anton uppercase leading-[.95]">Custom Orders</h3>
+                  <p className="text-xs text-ink/70">Personalized or 3D printed-to-order items.</p>
                </div>
-               <div className="bg-white p-4 rounded-none border border-hair">
-                  <h3 className="text-brand font-bold text-sm mb-1">Gift Cards</h3>
-                  <p className="text-xs text-muted">Digital or physical gift vouchers.</p>
+               <div className="bg-white p-4 rounded-none border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+                  <h3 className="text-brand text-sm mb-1 font-anton uppercase leading-[.95]">Gift Cards</h3>
+                  <p className="text-xs text-ink/70">Digital or physical gift vouchers.</p>
                </div>
             </div>
           </section>
 
           {/* Section 6 */}
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl text-ink mb-4 flex items-center gap-3 font-anton uppercase leading-[.95]">
               <span className="gl-lbl text-brand text-sm">06.</span> Refund Process & Timeline
             </h2>
-            <p className="leading-relaxed text-muted">
+            <p className="leading-relaxed text-ink/70">
               We do not offer refunds on delivered orders. For an approved damaged, defective or wrong-item claim, we will inspect the item and dispatch a replacement. A refund is issued only if we are unable to provide a replacement.
               <br /><br />
               If a refund is approved (for cancelled orders, or approved claims we cannot replace), it will be processed to your original payment method within <strong className="text-ink font-semibold">5-7 business days</strong>. Banks may take an additional 3-5 days to reflect the amount in your account.

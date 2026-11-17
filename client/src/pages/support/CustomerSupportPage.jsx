@@ -67,7 +67,7 @@ const CustomerSupportPage = () => {
 
 
     return (
-        <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
+        <div className="bg-cream min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
             {/* --- AMBIENT BACKGROUND --- */}
             <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
             <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
@@ -80,7 +80,7 @@ const CustomerSupportPage = () => {
                             <span className="h-[1px] w-8 bg-brand"></span>
                             <span className="gl-lbl text-brand text-[10px]">Support</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
+                        <h1 className="text-4xl md:text-5xl lg:text-6xl leading-tight font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
                             How can we <span className="text-brand">assist you?</span>
                         </h1>
                     </div>
@@ -88,14 +88,12 @@ const CustomerSupportPage = () => {
 
                 {/* --- TAB SWITCHER --- */}
                 <div className="flex justify-start mb-8">
-                    <div className="bg-[#f5f7f8] p-1.5 rounded-full border border-hair backdrop-blur-md flex relative shadow-inner">
+                    <div className="bg-cream p-1.5 rounded-full border-[3px] border-ink backdrop-blur-md flex relative shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                         {['contact', 'faq'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`relative px-6 md:px-8 py-2.5 md:py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all z-10 ${
-                                    activeTab === tab ? 'text-white' : 'text-gray-400 hover:text-gray-400'
-                                }`}
+                                className={`relative px-6 md:px-8 py-2.5 md:py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all z-10 ${ activeTab === tab ? 'text-white' : 'text-ink/60 hover:text-gray-400' }`}
                             >
                                 {tab === 'contact' ? 'Message Us' : 'Common Queries'}
                                 {activeTab === tab && (
@@ -110,10 +108,10 @@ const CustomerSupportPage = () => {
                 {activeTab === 'contact' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
                         {/* Left: Interactive Form (LIGHT BOX) */}
-                        <div className="lg:col-span-8 bg-[#f5f7f8] border border-transparent rounded-[24px] p-6 md:p-8 shadow-xl">
-                            <div className="mb-8 border-b border-gray-200 pb-6">
-                                <h3 className="text-2xl font-archivo font-bold text-ink mb-2">Send a Request</h3>
-                                <p className="text-sm text-gray-500 font-light">Our team typically responds within 2 hours.</p>
+                        <div className="lg:col-span-8 bg-cream border-[3px] border-transparent rounded-[24px] p-6 md:p-8 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+                            <div className="mb-8 border-b border-ink/15 pb-6">
+                                <h3 className="text-2xl text-ink mb-2 font-anton uppercase leading-[.95]">Send a Request</h3>
+                                <p className="text-sm text-ink/70 font-light">Our team typically responds within 2 hours.</p>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-6">
@@ -126,9 +124,7 @@ const CustomerSupportPage = () => {
                                             onChange={handleInputChange}
                                             type="text"
                                             required
-                                            className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${
-                                                errors.name ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                            }`}
+                                            className={`w-full bg-white border-2 rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${ errors.name ? 'border-red-500 focus:border-red-500' : 'border-ink focus:border-brand rounded-2xl min-h-[48px]' }`}
                                             placeholder="John Doe"
                                         />
                                         {errors.name && (
@@ -143,9 +139,7 @@ const CustomerSupportPage = () => {
                                             onChange={handleInputChange}
                                             type="email"
                                             required
-                                            className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${
-                                                errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                            }`}
+                                            className={`w-full bg-white border-2 rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${ errors.email ? 'border-red-500 focus:border-red-500' : 'border-ink focus:border-brand rounded-2xl min-h-[48px]' }`}
                                             placeholder="john@example.com"
                                         />
                                         {errors.email && (
@@ -172,9 +166,7 @@ const CustomerSupportPage = () => {
                                         onChange={handleInputChange}
                                         required
                                         rows="4"
-                                        className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 resize-none shadow-sm ${
-                                            errors.message ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                        }`}
+                                        className={`w-full bg-white border-2 rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 resize-none shadow-sm ${ errors.message ? 'border-red-500 focus:border-red-500' : 'border-ink focus:border-brand rounded-2xl' }`}
                                         placeholder="How can we help you today?"
                                     ></textarea>
                                     {errors.message && (
@@ -185,11 +177,7 @@ const CustomerSupportPage = () => {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-3 ${
-                                        isSubmitting 
-                                            ? 'bg-gray-400 text-white cursor-not-allowed' 
-                                            : 'bg-brand text-white hover:bg-brandHi'
-                                    }`}
+                                    className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-3 ${ isSubmitting ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-brand text-white hover:bg-brandHi' }`}
                                 >
                                     {isSubmitting ? (
                                         <>
@@ -206,7 +194,7 @@ const CustomerSupportPage = () => {
                         {/* Right: Contact Cards (LIGHT BOXES) */}
                         <div className="lg:col-span-4 space-y-4">
                             {/* Call Support */}
-                            <a href="tel:+919124081005" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href="tel:+919124081005" className="block p-6 rounded-[24px] bg-cream border-[3px] border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-solid fa-phone"></i>
@@ -214,13 +202,13 @@ const CustomerSupportPage = () => {
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
                                         <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
-                                        <p className="text-xs text-gray-500">Mon-Sat, 9AM - 7PM</p>
+                                        <p className="text-xs text-ink/70">Mon-Sat, 9AM - 7PM</p>
                                     </div>
                                 </div>
                             </a>
 
                             {/* Email Us */}
-                            <a href="mailto:urbanadmin@urbannook.in" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href="mailto:urbanadmin@urbannook.in" className="block p-6 rounded-[24px] bg-cream border-[3px] border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-solid fa-envelope"></i>
@@ -228,13 +216,13 @@ const CustomerSupportPage = () => {
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Email Us</h4>
                                         <p className="text-brand font-mono text-sm mb-2 hover:underline font-bold">urbanadmin@urbannook.in</p>
-                                        <p className="text-xs text-gray-500">Guaranteed response in 24h</p>
+                                        <p className="text-xs text-ink/70">Guaranteed response in 24h</p>
                                     </div>
                                 </div>
                             </a>
 
                             {/* WhatsApp */}
-                            <a href={getSupportWhatsAppUrl(SUPPORT_CHAT_TEXT)} onClick={onSupportWhatsAppClick(SUPPORT_CHAT_TEXT)} rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href={getSupportWhatsAppUrl(SUPPORT_CHAT_TEXT)} onClick={onSupportWhatsAppClick(SUPPORT_CHAT_TEXT)} rel="noreferrer" className="block p-6 rounded-[24px] bg-cream border-[3px] border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-brands fa-whatsapp text-xl"></i>
@@ -242,7 +230,7 @@ const CustomerSupportPage = () => {
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
                                         <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
-                                        <p className="text-xs text-gray-500">Available 24/7</p>
+                                        <p className="text-xs text-ink/70">Available 24/7</p>
                                     </div>
                                 </div>
                             </a>
@@ -253,28 +241,22 @@ const CustomerSupportPage = () => {
                 {/* --- FAQ TAB (LIGHT BOX) --- */}
                 {activeTab === 'faq' && (
                     <div>
-                        <div className="bg-[#f5f7f8] border border-transparent rounded-[24px] overflow-hidden shadow-xl">
+                        <div className="bg-cream border-[3px] border-transparent rounded-[24px] overflow-hidden shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                             {supportFaqs.map((faq, index) => (
-                                <div key={faq.id} className="border-b border-gray-200 last:border-0">
+                                <div key={faq.id} className="border-b border-ink/15 last:border-0">
                                     <button
                                         onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
                                         className="w-full p-6 md:p-8 flex justify-between items-center text-left group hover:bg-white transition-colors"
                                     >
-                                        <span className={`text-base md:text-lg font-archivo font-bold transition-colors ${
-                                            expandedFaq === index ? 'text-brand' : 'text-ink'
-                                        }`}>
+                                        <span className={`text-base md:text-lg font-archivo font-bold transition-colors ${ expandedFaq === index ? 'text-brand' : 'text-ink' }`}>
                                             {faq.question}
                                         </span>
-                                        <span className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                                            expandedFaq === index ? 'rotate-180 bg-brand text-white border-brand' : 'text-gray-400 border-gray-200'
-                                        }`}>
+                                        <span className={`w-8 h-8 rounded-full border-[3px] flex items-center justify-center transition-all duration-300 shadow-[4px_4px_0_rgb(var(--gl-ink))] ${ expandedFaq === index ? 'rotate-180 bg-brand text-white border-brand' : 'text-ink/60 border-ink/15' }`}>
                                             <i className="fa-solid fa-chevron-down text-xs"></i>
                                         </span>
                                     </button>
-                                    <div className={`overflow-hidden bg-white transition-all duration-300 ${
-                                        expandedFaq === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                                    }`}>
-                                        <div className="px-6 md:px-8 pb-8 text-gray-500 text-sm leading-relaxed font-light">
+                                    <div className={`overflow-hidden bg-white transition-all duration-300 ${ expandedFaq === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }`}>
+                                        <div className="px-6 md:px-8 pb-8 text-ink/70 text-sm leading-relaxed font-light">
                                             {faq.answer}
                                         </div>
                                     </div>
@@ -282,7 +264,7 @@ const CustomerSupportPage = () => {
                             ))}
                         </div>
                         <div className="mt-8 text-center">
-                            <p className="text-muted text-xs uppercase tracking-widest mb-4">Still need help?</p>
+                            <p className="text-ink/70 text-xs uppercase tracking-widest mb-4">Still need help?</p>
                             <button
                                 onClick={() => setActiveTab('contact')}
                                 className="text-brand border-b border-brand pb-1 hover:text-ink hover:border-ink transition-colors text-sm font-archivo"

@@ -45,7 +45,7 @@ const Faq = () => {
   };
 
   return (
-    <div className="bg-paper min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
+    <div className="bg-cream min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
       <SEOHead
         title="FAQs"
         description="Frequently asked questions about UrbanNook - shipping, exchanges, custom orders, assembly, and more."
@@ -64,16 +64,16 @@ const Faq = () => {
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 md:py-28">
 
         {/* Header */}
-        <div className="mb-16 text-left border-b border-hair pb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-hair w-fit mb-6">
+        <div className="mb-16 text-left border-b border-ink/15 pb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cream border-[3px] border-ink w-fit mb-6 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
             <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
             <span className="gl-lbl text-[10px] text-brand">Help Center</span>
           </div>
 
-          <h1 className="font-archivo text-4xl md:text-6xl font-extrabold text-ink mb-4 leading-[1.05] tracking-tight">
+          <h1 className="text-4xl md:text-6xl mb-4 leading-[1.05] font-anton uppercase text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
             Frequently Asked <span className="text-brand">Questions</span>
           </h1>
-          <p className="text-muted text-sm md:text-base max-w-2xl">
+          <p className="text-ink/70 text-sm md:text-base max-w-2xl">
             Everything you need to know about our products and billing. Can&apos;t find the answer you&apos;re looking for? Chat with us.
           </p>
         </div>
@@ -84,7 +84,7 @@ const Faq = () => {
             <div key={idx} className="grid md:grid-cols-3 gap-8 md:gap-12">
               {/* Category Title */}
               <div className="md:col-span-1">
-                <h3 className="font-archivo text-2xl font-bold text-ink sticky top-24">{section.category}</h3>
+                <h3 className="text-2xl text-ink sticky top-24 font-anton uppercase leading-[.95]">{section.category}</h3>
                 <div className="h-1 w-12 bg-brand mt-4"></div>
               </div>
 
@@ -96,7 +96,7 @@ const Faq = () => {
                       <span className="gl-lbl text-brand text-sm mt-1">0{itemIdx + 1}.</span>
                       {item.q}
                     </h4>
-                    <p className="text-muted leading-relaxed pl-7 border-l-2 border-hair ml-1.5">
+                    <p className="text-ink/70 leading-relaxed pl-7 border-l-2 border-ink/15 ml-1.5">
                       {item.a}
                     </p>
                   </div>

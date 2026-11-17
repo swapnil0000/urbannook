@@ -175,7 +175,7 @@ const SyncProvider = ({ children }) => {
 // for each request; in the browser the app store is used.
 function App({ store = browserStore, helmetContext }) {
   useEffect(() => {
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
+    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: rgb(var(--gl-ink)); color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
 
   return (

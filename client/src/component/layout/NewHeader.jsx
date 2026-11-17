@@ -153,7 +153,7 @@ const NewHeader = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-ink/95 backdrop-blur border-b border-white/10 font-inter text-paper">
+      <header className="sticky top-0 z-50 bg-cream border-b-[3px] border-ink font-inter text-ink">
         <div className="max-w-[1280px] mx-auto px-5 h-16 flex items-center justify-between gap-4">
           {/* left */}
           <div className="flex items-center gap-2.5">
@@ -161,16 +161,16 @@ const NewHeader = () => {
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">{isMenuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
             </button>
             <Link to="/" className="flex items-center shrink-0" aria-label="UrbanNook - home">
-              <span className="un-wordmark font-archivo font-extrabold text-2xl md:text-3xl tracking-tight uppercase select-none">urbannook</span>
+              <span className="font-anton text-brand text-[1.7rem] md:text-[2.1rem] leading-none uppercase tracking-tight select-none [text-shadow:2px_2px_0_rgb(var(--gl-ink))] transition-transform hover:-rotate-2">UrbanNook</span>
             </Link>
           </div>
 
           {/* center nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
+          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2">
             {navLinks.map((item) => (item.menu ? (
               <NavDropdown key={item.key} label={item.name} to={item.path} active={location.pathname === item.path} menu={item.menu} />
             ) : (
-              <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 transition-colors ${activeRoute === item.key ? 'text-brand' : 'text-paper/70 hover:text-brand'}`}>
+              <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 font-anton uppercase tracking-wide text-[15px] px-3.5 py-1.5 rounded-full border-2 transition-colors ${activeRoute === item.key ? 'bg-forest border-forest text-lime' : 'border-transparent text-ink hover:bg-lime hover:border-ink'}`}>
                 {item.name}
               </Link>
             )))}
@@ -180,7 +180,7 @@ const NewHeader = () => {
           <div className="flex items-center gap-3 md:gap-4">
             {user ? (
               <div className="relative hidden sm:block" ref={ddRef}>
-                <button onClick={() => setShowUserDropdown((s) => !s)} className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-full border border-white/20 hover:border-white/50 transition-colors">
+                <button onClick={() => setShowUserDropdown((s) => !s)} className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border-2 border-ink bg-white hover:bg-lime transition-colors">
                   <span className="w-7 h-7 rounded-full bg-brand text-white grid place-items-center text-xs font-bold">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
                   <span className="text-sm font-semibold max-w-[80px] truncate">{user?.name?.split(' ')[0]}</span>
                 </button>
@@ -197,31 +197,31 @@ const NewHeader = () => {
                 )}
               </div>
             ) : (
-              <button onClick={() => setShowLogin(true)} className="w-9 h-9 grid place-items-center hover:text-brand transition-colors" aria-label="Account">{Icon.user}</button>
+              <button onClick={() => setShowLogin(true)} className="w-11 h-11 grid place-items-center rounded-full border-2 border-ink bg-white hover:bg-lime transition-colors" aria-label="Account">{Icon.user}</button>
             )}
 
             {user && (
-              <Link to="/wishlist" className="relative w-9 h-9 hidden sm:grid place-items-center hover:text-brand transition-colors" aria-label="Wishlist">
+              <Link to="/wishlist" className="relative w-11 h-11 hidden sm:grid place-items-center rounded-full border-2 border-ink bg-white hover:bg-lime transition-colors" aria-label="Wishlist">
                 {Icon.heart}
                 {wishlistCount > 0 && <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-sale text-white text-[10px] font-bold grid place-items-center">{wishlistCount}</span>}
               </Link>
             )}
 
-            <button onClick={openCart} className="relative w-9 h-9 grid place-items-center hover:text-brand transition-colors" aria-label="Cart">
-              {Icon.cart}
-              {totalQuantity > 0 && <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-sale text-white text-[10px] font-bold grid place-items-center">{totalQuantity}</span>}
+            <button onClick={openCart} className="relative inline-flex items-center gap-2 h-11 pl-3 pr-4 rounded-full border-2 border-ink bg-brand text-white font-anton uppercase tracking-wide text-[15px] shadow-[3px_3px_0_rgb(var(--gl-ink))] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] transition-[transform,box-shadow]" aria-label={`Cart, ${totalQuantity || 0} items`}>
+              {Icon.cart}<span className="hidden sm:inline">Cart</span>
+              <span aria-hidden="true" className="min-w-[22px] h-[22px] px-1 rounded-full bg-mustard text-ink border-2 border-ink text-[11px] font-inter font-bold grid place-items-center">{totalQuantity || 0}</span>
             </button>
           </div>
         </div>
 
         {/* mobile dropdown */}
         {isMenuOpen && (
-          <div className="un-scroll md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
+          <div className="un-scroll md:hidden border-t-2 border-ink bg-cream text-ink px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
             <nav className="flex flex-col">
               {mobileNavLinks.map((item) => (item.menu ? (
                 <MobileNavAccordion key={item.key} label={item.name} active={location.pathname === item.path} menu={item.menu} onNavigate={handleMobileNav} open={openMobileMenu === item.key} onToggle={() => setOpenMobileMenu((k) => (k === item.key ? null : item.key))} />
               ) : (
-                <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b border-white/10 font-semibold ${activeRoute === item.key ? 'text-brand' : 'text-paper'}`}>{item.name}</button>
+                <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b-2 border-ink/10 font-anton uppercase tracking-wide text-xl ${activeRoute === item.key ? 'text-brand' : 'text-ink'}`}>{item.name}</button>
               )))}
             </nav>
             {user ? (
@@ -230,7 +230,7 @@ const NewHeader = () => {
                 <button onClick={handleLogout} disabled={isLoggingOut} className="text-sm text-sale font-semibold">Logout</button>
               </div>
             ) : (
-              <button onClick={() => { setIsMenuOpen(false); setShowLogin(true); }} className="gl-press w-full mt-4 bg-brand text-white font-bold text-sm py-3 rounded-xl hover:bg-brandHi">Login / Sign up</button>
+              <button onClick={() => { setIsMenuOpen(false); setShowLogin(true); }} className="gl-press w-full mt-4 bg-brand text-white font-anton uppercase tracking-wide text-lg py-3 rounded-full border-2 border-ink shadow-[3px_3px_0_rgb(var(--gl-ink))]">Login / Sign up</button>
             )}
           </div>
         )}

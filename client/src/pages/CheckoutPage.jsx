@@ -1650,19 +1650,19 @@ const CheckoutPage = () => {
     const busy = isOrdering || (payChoice === "EXPRESS" && !paymentError);
 
     return (
-      <div className="bg-[#f5f7f5] min-h-[80vh] pt-8 lg:pt-10">
+      <div className="bg-cream min-h-[80vh] pt-6 lg:pt-10">
         <div className="max-w-xl mx-auto px-4 sm:px-6 pb-16">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 font-medium hover:text-ink transition-colors mb-7"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border-2 border-ink bg-white px-4 font-anton uppercase text-sm text-ink hover:bg-lime transition-colors mb-5"
           >
             <i className="fa-solid fa-chevron-left text-[10px]" /> Cart
           </button>
 
-          <h1 className="text-[26px] sm:text-[32px] font-bold text-ink leading-tight tracking-tight">
+          <h1 className="font-anton uppercase text-brand text-[clamp(2.2rem,9vw,3.5rem)] leading-[.9] [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
             How would you like to pay?
           </h1>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-ink/70 mt-3">
             {unitCount} {unitCount === 1 ? "item" : "items"} ready to go.
           </p>
           {siteShipNotice && <p className="mt-1 text-[11px] leading-snug text-gray-400">{siteShipNotice}</p>}
@@ -1670,7 +1670,28 @@ const CheckoutPage = () => {
           <div className="mt-4 empty:hidden"><GiftClaimList /></div>
 
           {/* ── What it costs so far ───────────────────────────────────── */}
-          <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="mt-6 bg-white rounded-[24px] border-[3px] border-ink shadow-[5px_5px_0_rgb(var(--gl-ink))] p-4 sm:p-5">
+            {/* what is in the order - so nobody has to reopen the cart drawer to check */}
+            <ul className="-mx-1 mb-4 space-y-3 border-b-2 border-dashed border-ink/15 pb-4" aria-label="Items in your order">
+              {cartItems.map((it) => {
+                const qty = Number(it.quantity) || 0;
+                const unit = Number(it.price) || 0;
+                return (
+                  <li key={`${it.id}-${it.selectedVariant || ''}-${it.sku || ''}`} className="flex items-center gap-3 px-1">
+                    <span className="relative shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-ink bg-cream overflow-hidden">
+                      {it.image && <img src={it.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />}
+                      {qty > 1 && <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 grid place-items-center rounded-full border-2 border-ink bg-mustard text-[11px] font-bold text-ink">{qty}</span>}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-bold text-ink leading-snug line-clamp-2">{it.name}</span>
+                      {it.selectedVariant && it.selectedVariant !== it.name && <span className="block text-[12px] text-ink/60 truncate">{it.selectedVariant}</span>}
+                      <span className="block text-[12px] text-ink/60 tabular-nums">{qty} × ₹{Math.round(unit).toLocaleString("en-IN")}</span>
+                    </span>
+                    <span className="shrink-0 font-anton text-lg text-ink tabular-nums">₹{Math.round(unit * qty).toLocaleString("en-IN")}</span>
+                  </li>
+                );
+              })}
+            </ul>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>
               <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal + ruleDiscountSavings).toLocaleString("en-IN")}</span>
@@ -1694,8 +1715,8 @@ const CheckoutPage = () => {
               </div>
             )}
             <div className="flex items-center justify-between pt-3.5 mt-3.5 border-t border-gray-100">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Items total</span>
-              <span className="text-xl font-bold text-ink tabular-nums">₹{Math.round(itemsTotal).toLocaleString("en-IN")}</span>
+              <span className="font-anton uppercase text-lg text-ink">Items total</span>
+              <span className="font-anton text-2xl text-brand tabular-nums">₹{Math.round(itemsTotal).toLocaleString("en-IN")}</span>
             </div>
             <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
               Delivery is priced once we have your pincode - free on eligible orders.
@@ -1738,32 +1759,32 @@ const CheckoutPage = () => {
             <button
               onClick={handleExpressPay}
               disabled={busy}
-              className="w-full text-left rounded-2xl bg-white border-2 border-ink px-5 py-4 flex items-center gap-4 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:hover:bg-white group"
+              className="w-full text-left rounded-full bg-brand text-white border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] px-6 min-h-[60px] flex items-center gap-4 transition-[transform,box-shadow] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--gl-ink))] disabled:cursor-wait group"
             >
-              <span className="w-2 h-2 rounded-full bg-ink shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-mustard border border-ink shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-bold text-[15px] text-ink">Prepaid</span>
+                <span className="block font-anton uppercase tracking-wide text-xl">Prepaid</span>
                 {busy && (
-                  <span className="block text-[13px] text-gray-500 mt-0.5">Opening payment…</span>
+                  <span className="block text-[13px] text-white/80 mt-0.5">Opening payment…</span>
                 )}
               </span>
               {busy ? (
-                <span className="w-4 h-4 border-2 border-gray-300 border-t-ink rounded-full animate-spin shrink-0" />
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
               ) : (
-                <i className="fa-solid fa-chevron-right text-[11px] text-gray-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                <i className="fa-solid fa-arrow-right text-sm text-white shrink-0 transition-transform group-hover:translate-x-0.5" />
               )}
             </button>
 
             <button
               onClick={handleChooseCodPath}
               disabled={busy}
-              className="w-full text-left rounded-2xl bg-white border border-gray-300 px-5 py-4 flex items-center gap-4 transition-colors hover:border-gray-400 disabled:opacity-50 group"
+              className="w-full text-left rounded-full bg-white text-ink border-[3px] border-ink px-6 min-h-[60px] flex items-center gap-4 transition-colors hover:bg-lime disabled:opacity-50 group"
             >
-              <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-forest shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-bold text-[15px] text-ink">Partial COD</span>
+                <span className="block font-anton uppercase tracking-wide text-xl">Partial COD</span>
               </span>
-              <i className="fa-solid fa-chevron-right text-[11px] text-gray-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              <i className="fa-solid fa-arrow-right text-sm text-ink shrink-0 transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
 
@@ -1773,13 +1794,13 @@ const CheckoutPage = () => {
             <button
               onClick={handleLeaveExpress}
               disabled={busy}
-              className="mt-4 text-xs text-gray-400 hover:text-ink transition-colors disabled:opacity-40"
+              className="mt-4 min-h-[44px] text-sm font-semibold text-ink/70 underline underline-offset-4 hover:text-brand transition-colors disabled:opacity-40"
             >
               Use a saved address instead
             </button>
           )}
 
-          <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-8">
+          <p className="flex items-center justify-center gap-1.5 text-[12px] text-ink/60 mt-8">
             <i className="fa-solid fa-lock text-[9px]" /> Secured by Razorpay
           </p>
         </div>

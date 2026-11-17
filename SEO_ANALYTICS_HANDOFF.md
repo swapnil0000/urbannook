@@ -311,3 +311,35 @@ share of it. Not changed by the storefront team (rule 9) — please consider:
    load; a longer delay (or `requestIdleCallback`) would move it out of the measured window.
 3. **Clarity** ≈ 25 KB but a 200 ms long task on /products. Already deferred 3 s; consider sampling
    (e.g. load for 30 % of sessions).
+
+## L. UI revamp, round 2 (2026-11-17, branch feature/ui-revamp) - what changes for SEO
+
+Checked against every changed page: `SEOHead` calls, canonicals, H1 count and H1 text are the same as `main`.
+No URL, no redirect, no robots tag and no SEO-owned file (`prerender`, `upload-client.sh`, `analytics.js`,
+`SEOHead`, `SeoPageContent`, `entry-server`) was changed.
+
+**ACTION - new structured data on the home page.** The home page now shows a visible FAQ section and outputs a
+matching **FAQPage** JSON-LD from the same list (`pages/home/HomePage.jsx`, `FAQ_LD`). `<SeoPageContent>` also
+outputs FAQPage JSON-LD when Admin -> SEO Pages has FAQs for `/`. Today `/` has none (checked), so there is one
+block. If FAQs are ever added for `/` in Admin, the page would carry **two FAQPage blocks** - please decide: keep
+admin FAQs for `/` empty, or ask us to drop `FAQ_LD` when admin FAQs exist.
+
+**On-page text that changed (prerendered HTML will differ)**
+- `/products/<id>` (design chooser, canonical to `/product/<id>`): the H2 "All N designs" is now "All designs".
+- Headings on the remaining pages (account, blog, about, rewards, legal, offers, support, 404, order/payment pages)
+  are restyled only; the text is unchanged. Upper case is CSS (`text-transform`), the HTML text keeps its case.
+- Long dashes in a few strings/comments are now plain hyphens (About page: "Strict QC - never cheap drop-shipping").
+
+**Links**
+- More internal links: the home page photo strip links every design, and `/products` / category pages show a
+  "See every design together" row linking to each `/products/<id>` chooser. The strip is shown twice for the loop;
+  the second copy is `aria-hidden` and `tabIndex=-1` (same hrefs, so no new URLs).
+- Product page design picker: the round photo swatches are now name-only pills. They are still real `<a href>` links
+  to each `/product/<id>/<sku>`. The removed photos had `alt=""`, so no image text is lost.
+
+**Speed / CLS**
+- The scroll-reveal animation is pure CSS and content is visible by default, so crawlers and no-JS renders see
+  everything. The photo strip moves with `transform` only (no layout shift). The product page code is preloaded on
+  the design chooser, and links there use a view transition (crossfade), so no blank frame between pages.
+- Colours now come from CSS variables (`--gl-cream`, `--gl-lime`, `--gl-forest`, `--gl-mustard`, `--gl-ink`). Visual
+  only.

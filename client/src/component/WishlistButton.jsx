@@ -65,8 +65,10 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
       className={`${sizeClasses[size]} backdrop-blur-md rounded-full flex items-center justify-center shadow-xl transition-colors ${
         isInWishlist ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-700 hover:bg-red-500 hover:text-white'
       } ${className}`}
+      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+      aria-pressed={isInWishlist}
     >
-      <i className="fa-solid fa-heart"></i>
+      <i className="fa-solid fa-heart" aria-hidden="true"></i>
     </button>
   );
 };

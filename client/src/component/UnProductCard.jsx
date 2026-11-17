@@ -85,7 +85,7 @@ const UnProductCard = ({
             it when a taller sibling card in the same row forces this card to
             grow - that used to leave a big dead gap between title and price. */}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-[15px] md:text-[17px] text-ink font-extrabold">{inr(price)}</span>
+          <span className="font-anton text-[19px] md:text-[22px] text-ink">{inr(price)}</span>
           {mrp > price && <span className="text-[11px] md:text-xs text-faint line-through">{inr(mrp)}</span>}
         </div>
         <StockStatus outOfStock={soldOut} className="mt-1.5" />

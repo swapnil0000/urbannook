@@ -5,14 +5,10 @@ import React, { useEffect, useState } from 'react';
 const AnimatedToggle = ({ checked, onChange }) => (
   <button
     onClick={onChange}
-    className={`relative w-12 h-7 rounded-full p-1 transition-colors duration-300 focus:outline-none flex items-center ${
-      checked ? 'bg-brand' : 'bg-hair'
-    }`}
+    className={`relative w-12 h-7 rounded-full p-1 transition-colors duration-300 focus:outline-none flex items-center ${ checked ? 'bg-brand' : 'bg-hair' }`}
   >
     <div
-      className={`w-5 h-5 rounded-full shadow-md transition-transform duration-300 ${
-        checked ? 'bg-white translate-x-5' : 'bg-gray-400 translate-x-0'
-      }`}
+      className={`w-5 h-5 rounded-full shadow-md transition-transform duration-300 ${ checked ? 'bg-white translate-x-5' : 'bg-gray-400 translate-x-0' }`}
     />
   </button>
 );
@@ -71,7 +67,7 @@ const SettingsPage = () => {
   ];
 
   return (
-    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white relative overflow-hidden">
+    <div className="bg-cream min-h-screen font-inter text-ink selection:bg-brand selection:text-white relative overflow-hidden">
 
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
@@ -81,7 +77,7 @@ const SettingsPage = () => {
         
         {/* --- HEADER --- */}
         <div className="mb-8 lg:mb-12 text-center lg:text-left">
-            <h1 className="text-4xl md:text-6xl font-archivo font-extrabold text-ink mb-2">
+            <h1 className="text-4xl md:text-6xl mb-2 font-anton uppercase leading-[.95] text-brand [text-shadow:2px_2px_0_rgb(var(--gl-ink))]">
                 Settings
             </h1>
             <p className="text-brand/60 text-sm md:text-base font-light tracking-wide">
@@ -93,14 +89,12 @@ const SettingsPage = () => {
             
             {/* --- NAVIGATION (Sticky on Mobile) --- */}
             <div className="lg:w-64 flex-shrink-0 sticky top-24 z-30">
-                <div className="bg-surface backdrop-blur-xl border border-hair p-1.5 rounded-2xl flex lg:flex-col overflow-x-auto no-scrollbar shadow-xl lg:shadow-none">
+                <div className="bg-cream backdrop-blur-xl border-[3px] border-ink p-1.5 rounded-[24px] flex lg:flex-col overflow-x-auto no-scrollbar lg:shadow-none shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`relative flex items-center gap-3 px-5 py-3 rounded-xl transition-all whitespace-nowrap lg:w-full group ${
-                                activeTab === tab.id ? 'text-white' : 'text-muted hover:text-ink'
-                            }`}
+                            className={`relative flex items-center gap-3 px-5 py-3 rounded-xl transition-all whitespace-nowrap lg:w-full group ${ activeTab === tab.id ? 'text-white' : 'text-ink/70 hover:text-ink' }`}
                         >
                             {/* Active Background Pill */}
                             {activeTab === tab.id && (
@@ -124,8 +118,8 @@ const SettingsPage = () => {
                 <div className="space-y-6">
                         {/* 1. NOTIFICATIONS */}
                         {activeTab === 'notifications' && (
-                            <div className="bg-surface backdrop-blur-md border border-hair rounded-[2rem] p-6 md:p-8">
-                                <h2 className="text-2xl font-archivo font-bold text-ink mb-6 flex items-center gap-3">
+                            <div className="bg-cream backdrop-blur-md border-[3px] border-ink rounded-[2rem] p-6 md:p-8 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+                                <h2 className="text-2xl text-ink mb-6 flex items-center gap-3 font-anton uppercase leading-[.95]">
                                     <i className="fa-regular fa-bell text-brand text-lg"></i> Notifications
                                 </h2>
                                 <div className="space-y-1">
@@ -135,10 +129,10 @@ const SettingsPage = () => {
                                         { key: 'push', label: 'Push Notifications', desc: 'App alerts for offers and cart updates' },
                                         { key: 'promotions', label: 'Marketing', desc: 'New arrivals and exclusive discounts' },
                                     ].map((item, i) => (
-                                        <div key={item.key} className={`flex items-center justify-between p-4 rounded-xl hover:bg-gray-100 transition-colors ${i !== 3 ? 'border-b border-hair' : ''}`}>
+                                        <div key={item.key} className={`flex items-center justify-between p-4 rounded-xl hover:bg-gray-100 transition-colors ${i !== 3 ? 'border-b border-ink/15' : ''}`}>
                                             <div>
-                                                <h3 className="text-ink font-medium text-sm">{item.label}</h3>
-                                                <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+                                                <h3 className="text-ink font-medium text-sm font-anton uppercase leading-[.95]">{item.label}</h3>
+                                                <p className="text-xs text-ink/70 mt-0.5">{item.desc}</p>
                                             </div>
                                             <AnimatedToggle 
                                                 checked={settings.notifications[item.key]} 
@@ -152,9 +146,9 @@ const SettingsPage = () => {
 
                         {/* 2. PRIVACY */}
                         {activeTab === 'privacy' && (
-                            <div className="bg-surface backdrop-blur-md border border-hair rounded-[2rem] p-6 md:p-8 space-y-8">
+                            <div className="bg-cream backdrop-blur-md border-[3px] border-ink rounded-[2rem] p-6 md:p-8 space-y-8 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                                 <div>
-                                    <h2 className="text-2xl font-archivo font-bold text-ink mb-6 flex items-center gap-3">
+                                    <h2 className="text-2xl text-ink mb-6 flex items-center gap-3 font-anton uppercase leading-[.95]">
                                         <i className="fa-solid fa-lock text-brand text-lg"></i> Privacy
                                     </h2>
                                     
@@ -165,21 +159,21 @@ const SettingsPage = () => {
                                             <select
                                                 value={settings.privacy.profileVisibility}
                                                 onChange={(e) => handleSelect('privacy', 'profileVisibility', e.target.value)}
-                                                className="w-full appearance-none bg-white p-4 pr-10 border border-hair rounded-xl focus:border-brand outline-none font-medium text-ink transition-all cursor-pointer"
+                                                className="w-full appearance-none bg-white p-4 pr-10 border-2 border-ink rounded-xl focus:border-brand outline-none font-medium text-ink transition-all cursor-pointer rounded-2xl min-h-[48px]"
                                             >
                                                 <option value="public" className="bg-white">Public (Visible to everyone)</option>
                                                 <option value="friends" className="bg-white">Friends Only</option>
                                                 <option value="private" className="bg-white">Private (Only Me)</option>
                                             </select>
-                                            <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs group-hover:text-brand transition-colors"></i>
+                                            <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-ink/70 pointer-events-none text-xs group-hover:text-brand transition-colors"></i>
                                         </div>
                                     </div>
 
                                     <div className="space-y-1">
-                                        <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-hair">
+                                        <div className="flex items-center justify-between p-4 rounded-[24px] bg-white border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))]">
                                             <div>
-                                                <h3 className="text-ink font-medium text-sm">Analytics</h3>
-                                                <p className="text-xs text-gray-500 mt-0.5">Share usage data to help us improve</p>
+                                                <h3 className="text-ink font-medium text-sm font-anton uppercase leading-[.95]">Analytics</h3>
+                                                <p className="text-xs text-ink/70 mt-0.5">Share usage data to help us improve</p>
                                             </div>
                                             <AnimatedToggle 
                                                 checked={settings.privacy.analytics} 
@@ -193,8 +187,8 @@ const SettingsPage = () => {
 
                         {/* 3. PREFERENCES */}
                         {activeTab === 'preferences' && (
-                            <div className="bg-surface backdrop-blur-md border border-hair rounded-[2rem] p-6 md:p-8">
-                                <h2 className="text-2xl font-archivo font-bold text-ink mb-6 flex items-center gap-3">
+                            <div className="bg-cream backdrop-blur-md border-[3px] border-ink rounded-[2rem] p-6 md:p-8 shadow-[4px_4px_0_rgb(var(--gl-ink))]">
+                                <h2 className="text-2xl text-ink mb-6 flex items-center gap-3 font-anton uppercase leading-[.95]">
                                     <i className="fa-solid fa-sliders text-brand text-lg"></i> General
                                 </h2>
 
@@ -210,13 +204,13 @@ const SettingsPage = () => {
                                                 <select
                                                     value={settings.preferences[field.key]}
                                                     onChange={(e) => handleSelect('preferences', field.key, e.target.value)}
-                                                    className="w-full appearance-none bg-white p-4 pr-10 border border-hair rounded-xl focus:border-brand outline-none font-medium text-ink transition-all cursor-pointer hover:bg-gray-50"
+                                                    className="w-full appearance-none bg-white p-4 pr-10 border-2 border-ink rounded-xl focus:border-brand outline-none font-medium text-ink transition-all cursor-pointer hover:bg-gray-50 rounded-2xl min-h-[48px]"
                                                 >
                                                     {field.options.map(o => (
                                                         <option key={o.v} value={o.v} className="bg-white">{o.t}</option>
                                                     ))}
                                                 </select>
-                                                <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs group-hover:text-brand transition-colors"></i>
+                                                <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-ink/70 pointer-events-none text-xs group-hover:text-brand transition-colors"></i>
                                             </div>
                                         </div>
                                     ))}
@@ -230,7 +224,7 @@ const SettingsPage = () => {
                     <button
                         onClick={saveSettings}
                         disabled={isSaving}
-                        className="w-full md:w-auto px-10 py-4 bg-brand text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brandHi hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+                        className="w-full md:w-auto px-10 py-4 bg-brand text-white rounded-full uppercase tracking-widest text-xs hover:bg-brandHi hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100 border-[3px] border-ink shadow-[4px_4px_0_rgb(var(--gl-ink))] font-anton tracking-wide min-h-[48px]"
                     >
                         {isSaving ? (
                             <>

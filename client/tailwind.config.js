@@ -60,6 +60,10 @@ export default {
         faint:   "rgb(var(--gl-faint) / <alpha-value>)",
         hair:    "rgb(var(--gl-hair) / <alpha-value>)",    // hairline borders
         surface: "rgb(var(--gl-surface) / <alpha-value>)", // light panels / cards
+        cream:   "rgb(var(--gl-cream) / <alpha-value>)",   // revamp page background
+        lime:    "rgb(var(--gl-lime) / <alpha-value>)",
+        forest:  "rgb(var(--gl-forest) / <alpha-value>)",
+        mustard: "rgb(var(--gl-mustard) / <alpha-value>)",
       },
       fontFamily: {
         anton: ["Anton", "ui-sans-serif", "sans-serif"],
