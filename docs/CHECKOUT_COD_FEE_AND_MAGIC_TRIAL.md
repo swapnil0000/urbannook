@@ -32,28 +32,25 @@ prepaid cost the customer exactly the same.
   - The button (`handleSwitchToPrepaid`):
     - Review: switches to prepaid and pays in one tap, and leaves the COD-only Review, so a dismissed
       Razorpay modal shows both pay buttons again.
-    - Contact / Address, Magic half of the trial: opens Razorpay Magic (it collects the address).
-    - Contact / Address, standard half: switches to prepaid; they pay on Review.
+    - Contact / Address with Magic on: opens Razorpay Magic (it collects the address).
+    - Contact / Address with Magic off in the build: switches to prepaid; they pay on Review.
   - It also appears as its own line on the order page (`orderView.service.js`), the invoice and the
     order-confirmation email.
 - **Prepaid** orders and **Magic** orders (prepaid-only) never carry it.
 
-## Magic vs standard checkout — 50/50 trial
+## Magic vs standard checkout — 50/50 trial (ended 2026-11-17)
 
 - **Name:** `magic_vs_standard_2026_11`.
-- **Who sees what:**
-  - "magic" half: the "How would you like to pay?" screen, where Pay online opens Razorpay Magic
-    (Express).
-  - "standard" half: Contact → Address → Review, then the standard Razorpay modal.
-- **Assignment:** `client/src/config/checkoutExperiment.js` hashes the browser's anonymous id, so a
-  shopper stays in one half across visits and login/logout. With no stable id (storage blocked) the
-  browser stays on Magic. When `VITE_MAGIC_CHECKOUT_ENABLED` is off there is no trial.
-- **Recorded on:**
-  - Every order, as `checkoutExperiment: { name, arm }`. The server stores only names listed in
-    `server/src/utils/checkoutExperiment.js`.
-  - GA4, as one `checkout_experiment` event per checkout visit (`experiment_name`, `experiment_arm`).
-- **Reading the result:** compare paid orders and revenue per arm (the halves are the same size, so
-  orders per arm compare directly):
+- **What it was:** half the shoppers ("standard") never saw Razorpay Magic: they went Contact →
+  Address → Review (where COD is offered) and paid in the standard Razorpay modal. The other half
+  ("magic") kept the "How would you like to pay?" screen, where Pay online opens Magic.
+- **Ended:** 2026-11-17, everyone is back on Magic. The checkout shows the Express screen whenever
+  `VITE_MAGIC_CHECKOUT_ENABLED` is on (`expressAvailable` in `client/src/pages/CheckoutPage.jsx`); the
+  client trial code (`client/src/config/checkoutExperiment.js`) and the `checkout_experiment` GA4 event
+  are gone.
+- **Data kept:** orders placed during the trial still have `checkoutExperiment: { name, arm }`; the
+  server still validates the field (`server/src/utils/checkoutExperiment.js`) but the checkout no longer
+  sends it. Result query:
   ```js
   db.orders.aggregate([
     { $match: { "checkoutExperiment.name": "magic_vs_standard_2026_11" } },
@@ -62,11 +59,7 @@ prepaid cost the customer exactly the same.
     { $sort: { "_id.arm": 1 } },
   ])
   ```
-  Exclude internal test orders the way the admin reports do. Run it for at least 2 weeks before
-  deciding.
-- **Ending it:** set `magicShare` in `client/src/config/checkoutExperiment.js` to `1` (everyone on
-  Magic) or `0` (no Magic), then deploy through the normal PR → Jenkins flow.
-- **No new secrets or env vars.**
+  Exclude internal test orders the way the admin reports do.
 
 ## Payment help line (call / WhatsApp)
 

@@ -1,11 +1,11 @@
-// Checkout A/B trials. The browser picks the arm (client/src/config/checkoutExperiment.js)
-// and sends it with the order; only names listed here are stored, so the field
+// Checkout A/B trials. The browser picked the arm and sent it with the order; only names listed here are stored, so the field
 // can be trusted when the arms are compared.
 //
-// magic_vs_standard_2026_11: half the shoppers pay online through Razorpay Magic
+// magic_vs_standard_2026_11: half the shoppers paid online through Razorpay Magic
 // (Express, no forms), half through the ordinary steps and the standard Razorpay
-// modal. Magic prepaid orders were failing ~72% of the time; this measures
-// whether the plain checkout sells more.
+// modal. Ended 2026-11-17 (everyone on Magic again): the checkout no longer sends
+// it, so only orders placed during the trial carry it. Kept so a stray or cached
+// client is still validated and those orders stay readable.
 const EXPERIMENTS = {
   magic_vs_standard_2026_11: ["magic", "standard"],
 };
