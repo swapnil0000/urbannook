@@ -1413,14 +1413,21 @@ const UNPAID_STATUSES = ["CREATED", "PROCESSING", "FAILED"];
 const fulfilCapturedPayment = async (order, payment) => {
   const razorpayOrderId = payment.order_id;
 
-    // ── Magic Checkout: the address only exists now ────────────────────
-    // Razorpay collected it in its own modal, so pull it onto the order
-    // BEFORE anything downstream (emails, ShipMozo, order confirmation)
-    // reads deliveryAddress. Also picks up the shipping fee Razorpay added
-    // from our serviceability callback.
-    if (order.isMagicOrder && !order.deliveryAddress?.pinCode) {
+    // ── Magic Checkout: address + what was actually paid ───────────────
+    // Razorpay collected the address in its own modal, added the shipping
+    // fee from our serviceability callback and applied any coupon picked in
+    // the modal — so the order is synced from Razorpay's order BEFORE
+    // anything downstream (emails, ShipMozo, invoice) reads it.
+    // The money is synced for EVERY Magic order still being paid for: it
+    // used to happen only when the order had no address yet, so a customer
+    // whose address was known at order-create kept the pre-checkout amount
+    // in our DB (no shipping, no Magic coupon — 21 orders, see
+    // urbannook-admin scripts/data/syncMagicAmounts.mjs). Once the order is
+    // PAID a second call (webhook + status poll) skips the fetch.
+    const magicNeedsAddress = order.isMagicOrder && !order.deliveryAddress?.pinCode;
+    if (order.isMagicOrder && (magicNeedsAddress || UNPAID_STATUSES.includes(order.status))) {
       const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
-      const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
+      const magicAddress = magicNeedsAddress ? toOrderDeliveryAddress(rpOrder?.customer_details) : null;
 
       if (magicAddress) {
         order.deliveryAddress = magicAddress;
@@ -1449,66 +1456,67 @@ const fulfilCapturedPayment = async (order, payment) => {
           };
         }
 
-        // Razorpay adds shipping_fee (from /magic/shipping-info) and
-        // subtracts any promotion, then re-states the order amount. Trust
-        // its numbers — they are what the customer actually paid.
-        const shippingFeeRupees = Number(rpOrder?.shipping_fee || 0) / 100;
-        if (shippingFeeRupees > 0) {
-          order.shippingInfo = { ...(order.shippingInfo?.toObject?.() || order.shippingInfo || {}), amount: shippingFeeRupees };
-        }
-        const amountAtCreate = Number(order.amount) || 0;
-        const paidRupees = Number(payment.amount || 0) / 100;
-        if (paidRupees > 0) order.amount = Math.ceil(paidRupees);
-
-        // Whatever coupon the customer actually ended up with is the one on
-        // Razorpay's order, not necessarily the one their cart had when the
-        // order was created — inside Magic they can swap it or remove it.
-        // Recording the cart's coupon regardless burned a redemption the
-        // customer never got (usageCount, per-user caps and the CouponUsage
-        // audit all key off order.coupon further down).
-        const rpPromotion = Array.isArray(rpOrder?.promotions) ? rpOrder.promotions[0] : null;
-        if (rpPromotion?.code) {
-          const rpCode = String(rpPromotion.code).toUpperCase().trim();
-          const sameAsCart =
-            order.coupon?.couponCodeName &&
-            String(order.coupon.couponCodeName).toUpperCase().trim() === rpCode;
-          if (!sameAsCart) {
-            const applied = await Coupon.findOne({ code: rpCode, isArchived: false }, { couponId: 1, code: 1 }).lean();
-            order.coupon = {
-              couponCodeId: applied?.couponId || rpPromotion.reference_id || null,
-              couponCodeName: applied?.code || rpCode,
-              discountAmount: Math.round(Number(rpPromotion.value || 0)) / 100,
-              isApplied: true,
-            };
-            console.log(`[MAGIC][webhook] coupon on ${razorpayOrderId} is "${rpCode}" (₹${order.coupon.discountAmount}), not the cart's`);
-          }
-        } else if (order.coupon?.isApplied) {
-          // No promotion echoed back. That does not prove the discount was
-          // lost — Razorpay does not always return `promotions` on a fetch —
-          // so check the money instead: a Magic order is created at
-          // subtotal-minus-discount and Razorpay adds shipping on top, so a
-          // honoured coupon pays (created amount + shipping fee). Anything
-          // materially above that means the customer paid full price and the
-          // redemption must NOT be recorded against them.
-          const expectedRupees = amountAtCreate + shippingFeeRupees;
-          if (paidRupees > expectedRupees + 1) {
-            console.log(
-              `[MAGIC][webhook] coupon "${order.coupon.couponCodeName}" not honoured on ${razorpayOrderId} ` +
-                `(paid ₹${paidRupees} vs expected ₹${expectedRupees}) — not redeeming it`,
-            );
-            order.coupon = { couponCodeId: null, couponCodeName: null, discountAmount: 0, isApplied: false };
-          }
-        }
-
-        await order.save();
-        console.log(
-          `[MAGIC][webhook] address captured for ${razorpayOrderId} — pin ${magicAddress.pinCode}, shipping ₹${shippingFeeRupees}, paid ₹${paidRupees}`,
-        );
-      } else {
+      } else if (magicNeedsAddress) {
         console.error(
           `[MAGIC][webhook] no customer_details on ${razorpayOrderId} — order has NO address, fulfilment will fail`,
         );
       }
+
+      // Razorpay adds shipping_fee (from /magic/shipping-info) and
+      // subtracts any promotion, then re-states the order amount. Trust
+      // its numbers — they are what the customer actually paid.
+      const shippingFeeRupees = Number(rpOrder?.shipping_fee || 0) / 100;
+      if (shippingFeeRupees > 0) {
+        order.shippingInfo = { ...(order.shippingInfo?.toObject?.() || order.shippingInfo || {}), amount: shippingFeeRupees };
+      }
+      const amountAtCreate = Number(order.amount) || 0;
+      const paidRupees = Number(payment.amount || 0) / 100;
+      if (paidRupees > 0) order.amount = Math.ceil(paidRupees);
+
+      // Whatever coupon the customer actually ended up with is the one on
+      // Razorpay's order, not necessarily the one their cart had when the
+      // order was created — inside Magic they can swap it or remove it.
+      // Recording the cart's coupon regardless burned a redemption the
+      // customer never got (usageCount, per-user caps and the CouponUsage
+      // audit all key off order.coupon further down).
+      const rpPromotion = Array.isArray(rpOrder?.promotions) ? rpOrder.promotions[0] : null;
+      if (rpPromotion?.code) {
+        const rpCode = String(rpPromotion.code).toUpperCase().trim();
+        const sameAsCart =
+          order.coupon?.couponCodeName &&
+          String(order.coupon.couponCodeName).toUpperCase().trim() === rpCode;
+        if (!sameAsCart) {
+          const applied = await Coupon.findOne({ code: rpCode, isArchived: false }, { couponId: 1, code: 1 }).lean();
+          order.coupon = {
+            couponCodeId: applied?.couponId || rpPromotion.reference_id || null,
+            couponCodeName: applied?.code || rpCode,
+            discountAmount: Math.round(Number(rpPromotion.value || 0)) / 100,
+            isApplied: true,
+          };
+          console.log(`[MAGIC][webhook] coupon on ${razorpayOrderId} is "${rpCode}" (₹${order.coupon.discountAmount}), not the cart's`);
+        }
+      } else if (order.coupon?.isApplied) {
+        // No promotion echoed back. That does not prove the discount was
+        // lost — Razorpay does not always return `promotions` on a fetch —
+        // so check the money instead: a Magic order is created at
+        // subtotal-minus-discount and Razorpay adds shipping on top, so a
+        // honoured coupon pays (created amount + shipping fee). Anything
+        // materially above that means the customer paid full price and the
+        // redemption must NOT be recorded against them.
+        const expectedRupees = amountAtCreate + shippingFeeRupees;
+        if (paidRupees > expectedRupees + 1) {
+          console.log(
+            `[MAGIC][webhook] coupon "${order.coupon.couponCodeName}" not honoured on ${razorpayOrderId} ` +
+              `(paid ₹${paidRupees} vs expected ₹${expectedRupees}) — not redeeming it`,
+          );
+          order.coupon = { couponCodeId: null, couponCodeName: null, discountAmount: 0, isApplied: false };
+        }
+      }
+
+      await order.save();
+      console.log(
+        `[MAGIC][webhook] synced ${razorpayOrderId}${magicAddress ? ` — address pin ${magicAddress.pinCode}` : ""}, shipping ₹${shippingFeeRupees}, paid ₹${paidRupees}`,
+      );
     }
 
     // idempotent update
