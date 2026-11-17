@@ -24,7 +24,6 @@ import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import { getApiUrl } from "../config/appUrls";
 import config from "../config/env";
-import { CHECKOUT_EXPERIMENT, getCheckoutArm } from "../config/checkoutExperiment";
 import CouponInput from "../component/CouponInput";
 import CheckoutCouponTickets from "../component/CheckoutCouponTickets";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
@@ -44,7 +43,7 @@ import { buildPromotionCartItems } from "../utils/promotionCartItems";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice, useSiteShippingNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getGaIds, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching, track } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getGaIds, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -371,13 +370,6 @@ const CheckoutPage = () => {
   // attempt, and someone who picked COD once must not be stuck with it for the
   // rest of the session with no way back to paying online.
   const [payChoice, setPayChoice] = useState(null);
-  // Magic-vs-standard trial (config/checkoutExperiment.js): "standard" never
-  // sees the Express screen. null when Magic is off in this build.
-  const [checkoutArm] = useState(getCheckoutArm);
-  const checkoutExperiment = checkoutArm ? { name: CHECKOUT_EXPERIMENT.name, arm: checkoutArm } : undefined;
-  useEffect(() => {
-    if (checkoutArm) track("checkout_experiment", { experiment_name: CHECKOUT_EXPERIMENT.name, experiment_arm: checkoutArm });
-  }, [checkoutArm]);
   const [showCodSheet, setShowCodSheet] = useState(false); // COD breakdown popup
   // When the user taps "Pay Online" while still on COD, we must first flip to
   // PREPAID and let shipping re-calc settle BEFORE charging - otherwise the
@@ -1236,7 +1228,6 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           magic: useMagic, // server skips address/shipping and sends line_items
-          checkoutExperiment, // which half of the Magic-vs-standard trial placed it
         claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           // Guests have no server-side cart to read this from - the boolean
@@ -1340,7 +1331,6 @@ const CheckoutPage = () => {
         },
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
-        checkoutExperiment, // which half of the Magic-vs-standard trial placed it
         claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
@@ -1463,7 +1453,7 @@ const CheckoutPage = () => {
   // On Review it waits for the COD quote so the figure is what the order charges.
   const showCodFeeNudge = paymentMethod === "COD" && codFee > 0 && (currentStep !== reviewStep || amountsSettled);
   const codSaveAmount = currentStep === reviewStep ? Math.max(codSaving, codFee) : codFee;
-  const codSaveLabel = `${currentStep !== reviewStep && !(config.features.enableMagicCheckout && checkoutArm === "magic") ? "Switch to online" : "Pay online"} & save ₹${codSaveAmount.toLocaleString()}`;
+  const codSaveLabel = `${currentStep !== reviewStep && !config.features.enableMagicCheckout ? "Switch to online" : "Pay online"} & save ₹${codSaveAmount.toLocaleString()}`;
 
   // Fire the queued online payment only after the toggle to PREPAID has
   // settled the amount - guarantees full amount, never a stale/lower one.
@@ -1549,12 +1539,12 @@ const CheckoutPage = () => {
   }, [pendingPay, paymentMethod, isOrdering]);
 
   // ── Express (guest + Magic): no forms at all ───────────────────────────────
-  // Offered only when the build flag is on, and only to the "magic" half of the
-  // checkout trial (the other half pays in the standard modal). The SERVER has the final say and
+  // Offered whenever the build flag is on (the Magic-vs-standard trial that
+  // hid it from half the shoppers ended 2026-11-17). The SERVER has the final say and
   // may still decline Magic (its own flag, or a guests-only rollout), in which
   // case the order it builds needs an address we never collected - that lands
   // in the guest error path above, which puts the steps back.
-  const expressAvailable = config.features.enableMagicCheckout && checkoutArm === "magic";
+  const expressAvailable = config.features.enableMagicCheckout;
   const showPayChoice =
     expressAvailable && (!payChoice || payChoice === "EXPRESS") && cartItems.length > 0;
 
