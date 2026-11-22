@@ -62,6 +62,9 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
   return (
     <button 
       onClick={handleWishlistToggle}
+      type="button"
+      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+      aria-pressed={isInWishlist}
       className={`${sizeClasses[size]} backdrop-blur-md rounded-full flex items-center justify-center shadow-xl transition-colors ${
         isInWishlist ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-700 hover:bg-red-500 hover:text-white'
       } ${className}`}

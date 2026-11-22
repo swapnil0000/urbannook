@@ -1,3 +1,4 @@
+import { buildCartContext, evaluatePromotions } from "./promotionEngine.util.js";
 /**
  * Which coupons the Razorpay Magic coupon sheet may list for ONE order.
  *
@@ -55,4 +56,30 @@ export const resolveMagicCouponIdentity = ({ order, payloadEmail, payloadMobile,
     email: payloadEmail || order?.guestInfo?.email || null,
     mobile: payloadMobile || order?.guestInfo?.mobile || order?.senderMobile || null,
   };
+};
+
+/**
+ * Does applying `code` inside the Magic modal unlock free shipping on this order?
+ *
+ * Magic creates the order BEFORE the customer picks a coupon, so order-create never saw it and
+ * the shipping callback (which charges the fee) can't know about it either. A free_shipping
+ * Promotion linked to the coupon (linkedCouponCode) therefore has to be evaluated here, with
+ * the coupon applied, over the order's own cart. Only promotions linked to this exact code are
+ * candidates, so nothing else can change the answer.
+ *
+ * `promotions` = active promotions; `items` = [{productId, quantity, variantSku}].
+ */
+export const couponUnlocksFreeShipping = (promotions, code, items, { subtotal, productMeta, isGuest } = {}) => {
+  const cleanCode = String(code || "").toUpperCase().trim();
+  const linked = (promotions || []).filter(
+    (p) => p.linkedCouponCode === cleanCode && (p.rewards || []).some((r) => r.type === "free_shipping"),
+  );
+  if (!cleanCode || !linked.length) return false;
+  const ctx = buildCartContext(items, {
+    subtotal,
+    productMeta,
+    customerType: isGuest ? "guest" : "registered",
+    appliedCouponCode: cleanCode,
+  });
+  return Boolean(evaluatePromotions(items, ctx, linked).freeShipping);
 };

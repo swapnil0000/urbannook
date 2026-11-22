@@ -38,6 +38,13 @@ const heroBannerSchema = new mongoose.Schema(
       enabled: { type: Boolean, default: true },
       seconds: { type: Number, default: 5 },
     },
+    display: {
+      collections: { type: [{ id: String, image: String }], default: undefined },
+      bestsellers: { type: [{ id: String, image: String }], default: undefined },
+      collectionProducts: { type: [{ id: String, image: String }], default: undefined },
+      festiveDeals: { type: [{ id: String, image: String }], default: undefined },
+      reviewPhotos: { type: [{ id: String, image: String }], default: undefined },
+    },
   },
   { timestamps: true, collection: "herobanners" },
 );

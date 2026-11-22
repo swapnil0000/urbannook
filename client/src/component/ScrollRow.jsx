@@ -7,8 +7,9 @@ import { useEffect, useRef, useState } from 'react';
  */
 // `activeKey`: when it changes, the child marked aria-current is scrolled into
 // view (the row keeps its old scroll across navigations, hiding the new pick).
-const ScrollRow = ({ children, className = '', fade = 'from-surface', activeKey }) => {
+const ScrollRow = ({ children, className = '', fade = 'from-surface', activeKey, controlsOutside = false, hideControls = false }) => {
   const ref = useRef(null);
+  const contentRef = useRef(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 
   useEffect(() => {
@@ -19,6 +20,7 @@ const ScrollRow = ({ children, className = '', fade = 'from-surface', activeKey 
     el.addEventListener('scroll', update, { passive: true });
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     ro?.observe(el);
+    if (contentRef.current) ro?.observe(contentRef.current);
     return () => { el.removeEventListener('scroll', update); ro?.disconnect(); };
   }, []);
 
@@ -35,18 +37,30 @@ const ScrollRow = ({ children, className = '', fade = 'from-surface', activeKey 
   const nudge = (dir) => ref.current?.scrollBy({ left: dir * Math.round(ref.current.clientWidth * 0.7), behavior: 'smooth' });
   const arrow = 'absolute top-1/2 -translate-y-1/2 z-10 grid h-8 w-8 place-items-center rounded-full border border-hair bg-white text-ink shadow-md';
 
+  if (controlsOutside) return (
+    <div className={`flex min-w-0 items-center gap-2 ${className}`}>
+      <div ref={ref} className="min-w-0 flex-1 overflow-x-auto gl-hscroll">
+        <div ref={contentRef} className="flex w-max items-center gap-2.5">{children}</div>
+      </div>
+      {(edges.left || edges.right) && <div className="flex w-[72px] shrink-0 items-center justify-between">
+        <button type="button" onClick={() => nudge(-1)} disabled={!edges.left} aria-label="Scroll left" className="grid h-8 w-8 place-items-center rounded-[4px] border border-hair bg-white text-ink disabled:invisible">‹</button>
+        <button type="button" onClick={() => nudge(1)} disabled={!edges.right} aria-label="Scroll right" className="grid h-8 w-8 place-items-center rounded-[4px] border border-hair bg-white text-ink disabled:invisible">›</button>
+      </div>}
+    </div>
+  );
+
   return (
     <div className={`relative ${className}`}>
       <div ref={ref} className="overflow-x-auto gl-hscroll">
-        <div className="flex items-center gap-2.5 w-max pr-10">{children}</div>
+        <div ref={contentRef} className={`flex items-center gap-2.5 w-max ${hideControls ? '' : 'pr-10'}`}>{children}</div>
       </div>
-      {edges.left && (
+      {!hideControls && edges.left && (
         <>
           <span className={`pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r ${fade} to-transparent`} aria-hidden="true" />
           <button type="button" onClick={() => nudge(-1)} aria-label="Scroll left" className={`${arrow} left-0`}>‹</button>
         </>
       )}
-      {edges.right && (
+      {!hideControls && edges.right && (
         <>
           <span className={`pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l ${fade} to-transparent`} aria-hidden="true" />
           <button type="button" onClick={() => nudge(1)} aria-label="Scroll right" className={`${arrow} right-0`}>›</button>

@@ -427,6 +427,7 @@ const CheckoutPage = () => {
     { skip: cartItems.length === 0 },
   );
   const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
+  const promoFreeShipping = Boolean(checkoutPromotionsData?.data?.freeShipping);
   // Same server-evaluated item discount preview shown in the cart. It is
   // subtracted from the raw/coupon subtotal for display only; order creation
   // independently applies the promotion when calculating the real charge.
@@ -672,8 +673,9 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const cartSubtotal =
             cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
-          const isFreeShippingEligible =
-            !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
+          // ...or a free_shipping promotion that matched (coupon-linked ones need the coupon applied)
+          const isFreeShippingEligible = promoFreeShipping ||
+            (!!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount);
           // realAmount = actual carrier rate, always - this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects - 0 when free
@@ -713,7 +715,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings]);
+  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings, promoFreeShipping]);
 
   useEffect(() => {
     if (savedAddressData?.success) {

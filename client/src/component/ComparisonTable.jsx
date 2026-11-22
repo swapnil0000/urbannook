@@ -6,8 +6,7 @@ import { useEffect, useRef, useState, memo, Fragment } from "react";
  * scroll-triggered stagger reveal, hover glow-pulse, shimmer sweep),
  * rebuilt with a flexbox layout so the highlighted column is one
  * continuous panel (header + all rows) instead of a CSS-grid row-span.
- * Content is bespoke marketing copy for the caliper lamp; keyed by a
- * lowercase keyword matched against the product name.
+ * Rows and copy come from the selected product’s Admin PDP settings.
  *
  * Colour theme: the site's 4-shade palette — red / black / cream / white.
  * Red, black (ink) and cream (paper) come from index.css's existing tokens
@@ -15,44 +14,6 @@ import { useEffect, useRef, useState, memo, Fragment } from "react";
  * the same as the plain white used for cards elsewhere on the site. No colour
  * outside this set is used anywhere in this file.
  */
-const COMPARISONS = {
-  caliper: {
-    eyebrow: "Why It's Different",
-    title: "Built to a Higher Standard",
-    badgeText: "Best Pick",
-    caption:
-      "Compared against typical desk-lighting alternatives in its category.",
-    rows: [
-      { label: "Wall mounted + Desk placed", other: "cross" },
-      // Asterisk markers commented out per request — restore the `note` keys
-      // (and the `footnotes` block below) together to bring the footnotes back.
-      { label: "Adjustable Brightness Control", other: "cross" },
-      {
-        label: "Hassle-Free Replacement Guarantee",
-        /* note: "*", */ other: "cross",
-      },
-      {
-        label: "6-months electronics warranty",
-        /* note: "**", */ other: "cross",
-      },
-      // { label: "Heat-resistant PETG build", other: "cross" },
-      { label: "Wide light area + Heat vents", other: "cross" },
-    ],
-    // Footnotes keyed to the asterisks above. Commented out per request —
-    // restore alongside the `note` markers on the rows above.
-    // footnotes: [
-    //   {
-    //     marker: "*",
-    //     text: "Shipping damage is replaced hassle-free.",
-    //   },
-    //   {
-    //     marker: "**",
-    //     text: "Warranty covers electronic components only — LED strip and power adapter. Coverage excludes physical or external damage, misuse, and unauthorised modification.",
-    //   },
-    // ],
-  },
-};
-
 const GLOW_INTENSITY = 0.6; // 0–1, mirrors the design's "glowIntensity" prop
 
 const CheckIcon = () => (
@@ -89,16 +50,14 @@ const CrossIcon = () => (
   </svg>
 );
 
-const ComparisonTable = ({ productName }) => {
-  const key = Object.keys(COMPARISONS).find((k) =>
-    (productName || "").toLowerCase().includes(k),
-  );
+const ComparisonTable = ({ data, heading }) => {
+  const hasRows = Array.isArray(data?.rows) && data.rows.length > 0;
   const sectionRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
 
   useEffect(() => {
-    if (!key || !sectionRef.current) return;
+    if (!hasRows || !sectionRef.current) return;
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -112,10 +71,9 @@ const ComparisonTable = ({ productName }) => {
     );
     io.observe(sectionRef.current);
     return () => io.disconnect();
-  }, [key]);
+  }, [hasRows]);
 
-  if (!key) return null;
-  const data = COMPARISONS[key];
+  if (!hasRows) return null;
 
   return (
     <section
@@ -124,7 +82,7 @@ const ComparisonTable = ({ productName }) => {
         position: "relative",
         background: "rgb(var(--gl-paper))",
         padding: "36px 24px",
-        fontFamily: "'Manrope', sans-serif",
+        fontFamily: "'Inter', ui-sans-serif, sans-serif",
         overflow: "hidden",
         isolation: "isolate",
       }}
@@ -156,7 +114,7 @@ const ComparisonTable = ({ productName }) => {
           </div>
           <h2
             style={{
-              fontFamily: "'Playfair Display', Georgia, serif",
+              fontFamily: "'Inter', ui-sans-serif, sans-serif",
               fontWeight: 600,
               lineHeight: 1.15,
               color: "rgb(var(--gl-ink) / 0.92)",
@@ -164,7 +122,7 @@ const ComparisonTable = ({ productName }) => {
             }}
             className="text-[28px] lg:text-[40px]"
           >
-            {data.title}
+            {heading || "Why choose UrbanNook?"}
           </h2>
         </div>
 
@@ -191,7 +149,8 @@ const ComparisonTable = ({ productName }) => {
               gridRow: `1 / -1`,
               position: "relative",
               overflow: "hidden",
-              borderRadius: 0,
+              borderRadius: 4,
+              boxShadow: "0 5px 16px rgb(var(--gl-ink) / 0.10)",
               // Full solid red fill, with a restrained glass-highlight layer
               // ON TOP of it (not instead of it) — a soft white diagonal
               // sheen and a slow shimmer sweep, both low-opacity so the panel
@@ -247,6 +206,8 @@ const ComparisonTable = ({ productName }) => {
               gridRow: `1 / -1`,
               background: "#fff",
               border: "1px solid transparent",
+              borderRadius: 4,
+              boxShadow: "0 5px 16px rgb(var(--gl-ink) / 0.08)",
               zIndex: 1,
             }}
           />
@@ -259,6 +220,8 @@ const ComparisonTable = ({ productName }) => {
               background: "#fff",
               zIndex: 1,
               border: "1px solid transparent",
+              borderRadius: 4,
+              boxShadow: "0 5px 16px rgb(var(--gl-ink) / 0.08)",
             }}
           />
 
@@ -499,7 +462,7 @@ const ComparisonTable = ({ productName }) => {
             color: "rgb(var(--gl-ink) / 0.45)",
           }}
         >
-          {data.caption}
+          {data.caption || ""}
         </p>
 
         {/* Footnotes — the asterisked qualifications on the warranty and

@@ -65,7 +65,7 @@ const ContactPage = () => {
             <div key={item.id} className="border border-hair rounded-2xl p-6 hover:border-brand transition-colors">
               <div className="w-11 h-11 rounded-full bg-brand/10 text-brand grid place-items-center mb-4"><i className={item.icon}></i></div>
               <p className="gl-lbl text-[10px] text-muted mb-1">{item.title}</p>
-              <p className="text-lg font-bold">{item.info}</p>
+              <p className="text-lg font-bold inline-flex items-center gap-2">{item.id === 1 && <i className="fa-brands fa-whatsapp text-brand text-base" aria-hidden="true" />}{item.info}</p>
               <p className="text-xs text-faint mt-1">{item.subInfo}</p>
             </div>
           ))}

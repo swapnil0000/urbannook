@@ -1,4 +1,28 @@
 import mongoose from "mongoose";
+const pdpSectionsSchema = new mongoose.Schema(Object.fromEntries([
+  "variantPicker", "deliveryOffer", "questions", "offers", "coupons",
+  "customization", "trust", "details", "specifications", "materialCare", "shippingExchange", "lookCloser", "customerPhotos",
+  "comparison", "reviews", "otherVariants", "related", "story", "faq",
+  "stickyBuyBar",
+].map((key) => [key, Boolean])), { _id: false });
+const pdpDisplaySchema = new mongoose.Schema({
+  titleMode: { type: String, enum: ["variant", "product"], default: "variant" },
+  sections: { type: pdpSectionsSchema, default: undefined },
+  headings: { type: new mongoose.Schema(Object.fromEntries(["details", "lookCloser", "comparison", "reviews", "related", "story", "faq"].map((key) => [key, { type: String, maxlength: 80 }])), { _id: false }), default: undefined },
+  order: [{ type: String, enum: ["comparison", "reviews", "otherVariants", "related", "story", "faq"] }],
+  comparison: {
+    type: new mongoose.Schema({
+      eyebrow: { type: String, maxlength: 60 },
+      caption: { type: String, maxlength: 180 },
+      rows: [{ label: { type: String, maxlength: 80 }, other: { type: String, enum: ["cross", "dash"], default: "dash" } }],
+    }, { _id: false }),
+    default: undefined,
+  },
+  media: {
+    lookCloserByVariant: { type: [{ sku: String, images: [String] }], default: undefined },
+    customerPhotos: { type: [{ id: String, image: String }], default: undefined },
+  },
+}, { _id: false });
 const productSchema = mongoose.Schema(
   {
     productName: {
@@ -91,6 +115,8 @@ const productSchema = mongoose.Schema(
       type: String,
       required: [true, "productDes is required"],
     },
+    // Admin-owned visual PDP configuration; absent keeps the existing layout.
+    pdpDisplay: { type: pdpDisplaySchema, default: undefined },
     productCategory: {
       type: String,
       required: [true, "productCategory is required"],

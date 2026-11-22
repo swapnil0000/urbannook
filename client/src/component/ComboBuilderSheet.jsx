@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { addItem } from '../store/slices/cartSlice';
-import { useAddToCartMutation, useGetCartPromotionsQuery } from '../store/api/userApi';
+import { useAddToCartMutation, useGetCartPromotionsQuery, useGetHomeComboOffersFullQuery } from '../store/api/userApi';
 import { useSiteCampaign } from '../hooks/useSiteCampaign';
 import { trackAddToCart } from '../utils/analytics';
 import { Garland, HangingDiya } from './festive/FestiveLights';
@@ -59,7 +59,7 @@ const VariantTile = ({ card, selected, onPick }) => {
  * (`combo.builder`). Pricing and validity of the exact selection come from the
  * existing cart promotion endpoint, so the sheet never invents a discount.
  */
-const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], onDismiss, onAdded }) => {
+const ComboBuilderSheetInner = ({ combo, onClose, mode = 'builder', cartItems = [], onDismiss, onAdded }) => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const [addToCartAPI] = useAddToCartMutation();
@@ -434,6 +434,24 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
           </>
         )}
       </div>
+    </div>,
+    document.body,
+  );
+};
+
+// The home offers list comes without variant lists (?lite=1); fetch the full one when a sheet opens.
+const ComboBuilderSheet = (props) => {
+  const lite = (props.combo.builder?.combos || []).some((c) => c.slots?.some((sl) => sl.options?.some((o) => !o.cards)));
+  const { data, isError } = useGetHomeComboOffersFullQuery(undefined, { skip: !lite });
+  const { onClose } = props;
+  useEffect(() => { if (isError) onClose?.(); }, [isError, onClose]);
+  if (!lite) return <ComboBuilderSheetInner {...props} />;
+  const full = data?.data?.combos?.find((c) => String(c.id) === String(props.combo.id));
+  if (full) return <ComboBuilderSheetInner {...props} combo={full} />;
+  if (isError) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/40" role="status" aria-label="Loading offer">
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/40 border-t-white" />
     </div>,
     document.body,
   );

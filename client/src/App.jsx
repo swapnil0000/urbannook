@@ -14,6 +14,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
+import AfterIdle from './component/AfterIdle';
 import FestiveEffects from './component/festive/FestiveEffects';
 import { SiteCampaignProvider } from './hooks/useSiteCampaign';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
@@ -174,6 +175,7 @@ const SyncProvider = ({ children }) => {
 // in entry-server.jsx. `store` and `helmetContext` are passed by entry-server
 // for each request; in the browser the app store is used.
 function App({ store = browserStore, helmetContext }) {
+  const isPdpPreview = useLocation().hash.startsWith('#pdpPreview=');
   useEffect(() => {
     console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
@@ -184,7 +186,7 @@ function App({ store = browserStore, helmetContext }) {
       <SiteCampaignProvider>
         <>
           <SmoothScroll>
-          <RouteTracker />
+          {!isPdpPreview && <RouteTracker />}
           <MotionLayer />
           <SessionManager>
             <SyncProvider>
@@ -218,6 +220,7 @@ function App({ store = browserStore, helmetContext }) {
                 </ErrorBoundary>
                 <Notification />
                 <GlMobileNav />
+                {!isPdpPreview && <>
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
@@ -233,20 +236,22 @@ function App({ store = browserStore, helmetContext }) {
                 </ErrorBoundary>
                 {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
-                  <FreeShippingPopup />
+                  <AfterIdle><FreeShippingPopup /></AfterIdle>
                 </ErrorBoundary>
                 {/* Live offers carousel — waits while the free-shipping popup is due */}
                 <ErrorBoundary>
-                  <OffersPopup />
+                  <AfterIdle><OffersPopup /></AfterIdle>
                 </ErrorBoundary>
                 {/* Promotion V2 "add more to unlock" bottom sheet */}
                 <ErrorBoundary>
+                  {/* not delayed: it listens for un:open-offer-sheet / un:checkout-intent, which a quick tap can fire early */}
                   <PromotionUnlockSheet />
                   <GiftClaimWatcher />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <HelpWidget />
                 </ErrorBoundary>
+                </>}
               </Suspense>
             </SyncProvider>
           </SessionManager>

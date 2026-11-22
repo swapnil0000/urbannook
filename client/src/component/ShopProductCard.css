@@ -1,0 +1,68 @@
+.gl-pcard.shop-product-card {
+  border-radius: 4px !important;
+  box-shadow: none;
+  transition: border-color 180ms ease;
+}
+
+.shop-listing-page .shop-category-pill,
+.shop-listing-page button[aria-label="Scroll left"],
+.shop-listing-page button[aria-label="Scroll right"],
+.shop-listing-page button[aria-label^="Remove filter"] {
+  border-radius: 4px !important;
+}
+
+/* The fixed Help bubble covers the right product image in two-column grids.
+   Listing pages retain support through the site's footer links. */
+#root:has(.shop-listing-page) .un-help-fab {
+  display: none;
+}
+
+@media (hover: hover) {
+  .gl-pcard.shop-product-card:hover {
+    transform: none;
+    border-color: rgb(var(--gl-muted) / 0.45);
+    box-shadow: none;
+  }
+}
+
+.shop-product-card .shop-product-details {
+  padding: 10px;
+}
+
+.shop-product-card .shop-product-title {
+  min-height: 2.8em;
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.shop-product-card .shop-product-selling {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-product-card .shop-product-mrp {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-product-card .shop-product-discount {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .shop-product-card .shop-product-details { padding: 12px; }
+  .shop-product-card .shop-product-title { font-size: 15px; }
+  .shop-product-card .shop-product-selling { font-size: 18px; }
+  .shop-product-card .shop-product-mrp { font-size: 13px; }
+  .shop-product-card .shop-product-discount { font-size: 12px; }
+}

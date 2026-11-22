@@ -17,9 +17,6 @@ export const toItems = (products = []) => {
       soldOut: v.variantOutOfStock === true || (v.variantQuantity != null && v.variantQuantity <= 0),
       price: Number(v.variantPrice || 0),
       group: p.productName, // the product this variant belongs to (Type filter)
-      // The product's tag badge (Bestseller/Trending/New) only on its first
-      // card; repeated on all ten pen-stand colours it was just noise.
-      badge: i === 0 ? undefined : null,
     }));
   });
   // Grouped: all of one product's variants together (BMW, Porsche, … side by

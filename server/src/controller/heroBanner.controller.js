@@ -1,6 +1,7 @@
 import { ApiRes } from "../utils/index.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import HeroBanner from "../model/heroBanner.model.js";
+import Product from "../model/product.model.js";
 
 const MAX_SLIDES = 6;
 
@@ -36,9 +37,27 @@ export const getActiveHeroBannerController = asyncHandler(async (_req, res) => {
       };
     });
   const seconds = Math.min(10, Math.max(3, Number(doc?.autoplay?.seconds) || 5));
+  const display = doc?.display || {};
+  const productPlacements = ["collections", "bestsellers", "collectionProducts", "festiveDeals"];
+  const hasProductChoices = productPlacements.some((key) => display[key]?.length);
+  let safeDisplay = display;
+  if (hasProductChoices) {
+    const products = await Product.find({ isPublished: { $ne: false }, isAddon: { $ne: true } })
+      .select("productId productCategory tags productImg secondaryImages variantDetails.variantImage variantDetails.variantMrp variantDetails.variantPrice variantDetails.isActive variantDetails.variantOutOfStock").lean();
+    const byId = new Map(products.map((product) => [product.productId, product]));
+    const imagesOf = (product) => [product.productImg, ...(product.secondaryImages || []), ...(product.variantDetails || []).flatMap((variant) => variant.variantImage || [])];
+    safeDisplay = { ...display };
+    for (const key of productPlacements) {
+      if (!Array.isArray(display[key])) continue;
+      safeDisplay[key] = display[key].filter((item) => key === "collections"
+        ? products.some((product) => product.productCategory === item.id && imagesOf(product).includes(item.image))
+        : Boolean(byId.get(item.id) && imagesOf(byId.get(item.id)).includes(item.image)));
+    }
+  }
   res.set("Cache-Control", "public, max-age=60");
   return res.status(200).json(new ApiRes(200, "Hero banner", {
     slides,
     autoplay: { enabled: doc?.autoplay?.enabled !== false, seconds },
+    display: safeDisplay,
   }, true));
 });

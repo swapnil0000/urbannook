@@ -69,23 +69,19 @@ const GiftingSection = ({ section }) => {
 };
 
 /**
- * The homepage's festive sections, in the admin-configured order, below
- * Bestsellers. With no live campaign - or a campaign with no sections
- * configured - this is exactly the original single Combo Offers section, so
- * the normal storefront is unchanged.
+ * The homepage's festive sections, in admin order. Combo Offers always shows
+ * (first, if the campaign has no combos section).
  */
 const FestiveSections = ({ lead }) => {
   const { active, sections, page } = useSiteCampaign();
-  if (!active || page !== 'home' || sections.length === 0) return <ComboOfferSection lead={lead} />;
-
-  return (
-    <>
-      {sections.map((s, i) => (s.type === 'combos'
-        ? <ComboOfferSection key={s.id} title={s.title} subtitle={s.subtitle} lead={i === sections.findIndex((x) => x.type === 'combos') ? lead : undefined} />
-        : <GiftingSection key={s.id} section={s} />))}
-      {/* the coupon strip lives inside the combos section; without one, show it on its own */}
-    </>
-  );
+  const list = active && page === 'home' ? sections : [];
+  // Combo Offers always renders under one key, so it stays mounted when the campaign answer arrives late.
+  const comboAt = list.findIndex((x) => x.type === 'combos');
+  const items = list.map((s, i) => (s.type === 'combos'
+    ? <ComboOfferSection key="combos" title={s.title} subtitle={s.subtitle} lead={i === comboAt ? lead : undefined} />
+    : <GiftingSection key={s.id} section={s} />));
+  if (comboAt < 0) items.unshift(<ComboOfferSection key="combos" lead={lead} />);
+  return <>{items}</>;
 };
 
 export default FestiveSections;

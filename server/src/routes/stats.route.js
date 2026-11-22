@@ -5,6 +5,7 @@ import Coupon from "../model/coupon.model.js";
 import User from "../model/user.model.js";
 import Testimonial from "../model/testimonial.model.js";
 import ProductReview from "../model/product.specific.testimonial.model.js";
+import { getHomePhotoReviews, getPhotoReviewsFor } from "../utils/photoReviews.util.js";
 import { excludeTestOrdersMatch, testUsersMatch } from "../utils/testIdentities.js";
 
 const statsRouter = Router();
@@ -20,6 +21,17 @@ const statsRouter = Router();
 // what the site shows) and sign-ups minus testers, for the homepage tiles and
 // the login card, which were typed in by hand ("2,000+ reviews" with ~70).
 const LIVE = { status: "PAID", resolutionStatus: { $nin: ["CANCELLED", "REFUNDED"] } };
+
+// Approved reviews that have a photo: the homepage wall ("Straight from your desks"), or with ?productId= only those of
+// the same kind of product (the product page's "Seen in real setups")
+statsRouter.get("/stats/photo-reviews", async (req, res) => {
+  try {
+    const { productId } = req.query;
+    return res.status(200).json({ success: true, data: productId ? await getPhotoReviewsFor(String(productId)) : await getHomePhotoReviews() });
+  } catch {
+    return res.status(500).json({ success: false, message: "Failed to fetch photo reviews" });
+  }
+});
 
 // Public endpoint - no auth required
 statsRouter.get("/stats/public", async (req, res) => {
