@@ -18,6 +18,7 @@ const SEOHead = ({
   type = 'website',
   structuredData,
   noIndex = false,
+  forceNoIndex = false,
 }) => {
   const { pathname } = useLocation();
   // Admin → SEO Pages overrides for this URL (null when none). While it loads,
@@ -44,7 +45,7 @@ const SEOHead = ({
       <meta name="description" content={seo.description} />
       {seo.canonicalUrl && <link rel="canonical" href={seo.canonicalUrl} />}
       {/* The only robots tag on the page (index.html has none, so they never conflict). */}
-      <meta name="robots" content={seo.noIndex ? 'noindex, nofollow' : 'index, follow'} />
+      <meta name="robots" content={forceNoIndex || seo.noIndex ? 'noindex, nofollow' : 'index, follow'} />
 
       {/* Open Graph */}
       <meta property="og:type" content={type} />

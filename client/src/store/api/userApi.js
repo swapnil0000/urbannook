@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { unpackCards } from "../../utils/cardTable";
 import { getApiUrl } from "../../config/appUrls";
 import { recordSuccessfulAdd } from "../slices/cartSlice";
 
@@ -418,7 +419,14 @@ export const userApi = apiSlice.injectEndpoints({
     // the real computed mrp/price/save — nothing here is a parallel pricing
     // system. keepUnusedDataFor: 0 so an admin edit is reflected immediately.
     getHomeComboOffers: builder.query({
-      query: () => "promotions/display/home",
+      // ?lite=1: no variant lists (only the combo-builder sheet reads them; see getHomeComboOffersFull).
+      query: () => "promotions/display/home?lite=1",
+      keepUnusedDataFor: 0,
+    }),
+    // The same offers with variant lists, fetched when a combo-builder sheet opens (?dedupe=1: repeated cards sent once).
+    getHomeComboOffersFull: builder.query({
+      query: () => "promotions/display/home?dedupe=1",
+      transformResponse: (res) => (res?.data ? { ...res, data: unpackCards(res.data) } : res),
       keepUnusedDataFor: 0,
     }),
   }),
@@ -468,4 +476,5 @@ export const {
   useGetCartPromotionsQuery,
   useGetCheckoutPromotionsQuery,
   useGetHomeComboOffersQuery,
+  useGetHomeComboOffersFullQuery,
 } = userApi;

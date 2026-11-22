@@ -47,10 +47,6 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
         style={{ touchAction: "pan-x" }}
       >
         {shown.map((variant, index) => {
-          const oos =
-            variant?.variantOutOfStock === true ||
-            (variant?.variantQuantity != null && Number(variant.variantQuantity) <= 0);
-
           /* Shaped like a product so the shared card can read it unchanged:
              one variant in variantDetails is all it needs for image, price
              and struck MRP. */
@@ -72,8 +68,6 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
                 listId="other_variants"
                 listName={`${productName} - Other Variants`}
                 href={`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`}
-                badge={oos ? "Out of stock" : null}
-                showWishlist={false}
               />
             </div>
           );

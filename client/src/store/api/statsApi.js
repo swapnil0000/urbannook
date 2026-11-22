@@ -6,10 +6,16 @@ export const statsApi = apiSlice.injectEndpoints({
       query: () => 'stats/public',
       keepUnusedDataFor: 600, // Cache for 10 minutes
     }),
+    // Every approved review that has a photo, for the homepage "Straight from your desks" wall
+    getPhotoReviews: builder.query({
+      // with a productId: only the photo reviews of the same kind of product (katana / lamp / …)
+      query: (productId) => (productId ? `stats/photo-reviews?productId=${encodeURIComponent(productId)}` : 'stats/photo-reviews'),
+      keepUnusedDataFor: 600,
+    }),
   }),
 });
 
-export const { useGetPublicStatsQuery } = statsApi;
+export const { useGetPublicStatsQuery, useGetPhotoReviewsQuery } = statsApi;
 
 // Public figures from GET /stats/public, always rounded DOWN so a claim is
 // never bigger than the truth: counts to the hundred (1006 -> "1000+") or, under

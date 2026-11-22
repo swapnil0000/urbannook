@@ -34,6 +34,14 @@ const NewHeader = () => {
   const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal, loginCallback } = useSelector((state) => state.ui);
   const { showCartModal: showCart, openCart, closeCart } = useUI();
+  // The drawer fetches offers, coupons and promotions on mount: mount it on first open (code preloaded when idle).
+  const [cartUsed, setCartUsed] = useState(false);
+  useEffect(() => { if (showCart) setCartUsed(true); }, [showCart]);
+  useEffect(() => {
+    const warm = () => import('./CartDrawer');
+    if (typeof window.requestIdleCallback === 'function') { const id = window.requestIdleCallback(warm, { timeout: 4000 }); return () => window.cancelIdleCallback?.(id); }
+    const t = setTimeout(warm, 3000); return () => clearTimeout(t);
+  }, []);
   const wishlistItems = useSelector((state) => state.wishlist.items);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -157,7 +165,7 @@ const NewHeader = () => {
         <div className="max-w-[1280px] mx-auto px-5 h-16 flex items-center justify-between gap-4">
           {/* left */}
           <div className="flex items-center gap-2.5">
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden w-9 h-9 grid place-items-center" aria-label="Menu">
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="lg:hidden w-9 h-9 grid place-items-center" aria-label="Menu">
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">{isMenuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
             </button>
             <Link to="/" className="flex items-center shrink-0" aria-label="UrbanNook - home">
@@ -166,7 +174,7 @@ const NewHeader = () => {
           </div>
 
           {/* center nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
+          <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold">
             {navLinks.map((item) => (item.menu ? (
               <NavDropdown key={item.key} label={item.name} to={item.path} active={location.pathname === item.path} menu={item.menu} />
             ) : (
@@ -216,7 +224,7 @@ const NewHeader = () => {
 
         {/* mobile dropdown */}
         {isMenuOpen && (
-          <div className="un-scroll md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
+          <div className="un-scroll lg:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
             <nav className="flex flex-col">
               {mobileNavLinks.map((item) => (item.menu ? (
                 <MobileNavAccordion key={item.key} label={item.name} active={location.pathname === item.path} menu={item.menu} onNavigate={handleMobileNav} open={openMobileMenu === item.key} onToggle={() => setOpenMobileMenu((k) => (k === item.key ? null : item.key))} />
@@ -262,11 +270,13 @@ const NewHeader = () => {
           />
         )}
 
-        <CartDrawer
-          isOpen={showCart}
-          onClose={closeCart}
-          cartItems={cartItems}
-        />
+        {cartUsed && (
+          <CartDrawer
+            isOpen={showCart}
+            onClose={closeCart}
+            cartItems={cartItems}
+          />
+        )}
       </Suspense>
     </>
   );

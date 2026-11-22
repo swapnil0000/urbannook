@@ -1,0 +1,606 @@
+/* PDP only: restrained corners and depth for actual surfaces. Pills, dots and
+   round icon controls retain their useful shape. */
+.pdp-page :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl),
+.pdp-page :is(.pdp-gallery-frame, .pdp-gallery-thumb, .pdp-photo-card, .gl-pcard) {
+  border-radius: 4px;
+}
+
+.pdp-page :is(.pdp-gallery-frame, .pdp-photo-card, .pdp-raised, .gl-pcard, section[aria-label="Offers on this product"]) {
+  box-shadow: 0 2px 5px rgb(var(--gl-ink) / 0.07), 0 12px 28px rgb(var(--gl-ink) / 0.045);
+}
+
+.pdp-page .pdp-gallery-thumb {
+  box-shadow: 0 2px 6px rgb(var(--gl-ink) / 0.08);
+}
+
+.pdp-page .pdp-photo-card {
+  overflow: hidden;
+  background: rgb(var(--gl-paper));
+}
+
+/* The storefront's global square-corner rule uses !important. Keep a single
+   4px surface radius only while the premium PDP flag is enabled. */
+.pdp-page.pdp-purchase-design-active :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .gl-pcard),
+.pdp-page.pdp-purchase-design-active :is(.pdp-gallery-frame, .pdp-gallery-thumb, .pdp-photo-card) {
+  border-radius: 4px !important;
+}
+
+.pdp-page.pdp-purchase-design-active {
+  --pdp-outline: rgb(var(--gl-hair));
+  --pdp-control-shadow: 0 2px 5px rgb(var(--gl-ink) / 0.08);
+}
+
+.pdp-page.pdp-purchase-design-active .pdp-gallery-frame {
+  border-color: var(--pdp-outline);
+}
+
+.pdp-page.pdp-purchase-design-active :is(.pdp-purchase-design-option, .pdp-version-option, .pdp-purchase-actions > button, .pdp-purchase-quantity, .pdp-customize-card) {
+  box-shadow: var(--pdp-control-shadow);
+}
+
+.pdp-page.pdp-purchase-design-active :is(.pdp-purchase-design-option:not([aria-current]), .pdp-version-option:not([aria-pressed='true']), .pdp-purchase-secondary, .pdp-purchase-quantity, .pdp-customize-card) {
+  border-color: var(--pdp-outline);
+}
+
+.pdp-page.pdp-purchase-design-active .pdp-purchase-primary {
+  border: 1px solid rgb(var(--gl-brand));
+}
+
+.pdp-page.pdp-purchase-design-active section[aria-label='Offers on this product'] {
+  border-color: var(--pdp-outline);
+}
+
+.pdp-page.pdp-purchase-design-active section[aria-label='Offers on this product'] button[aria-expanded] {
+  border-color: var(--pdp-outline);
+  box-shadow: var(--pdp-control-shadow);
+}
+
+.pdp-page.pdp-purchase-design-active .pdp-version-option > span:first-child {
+  font-weight: 600;
+}
+
+.pdp-page.pdp-purchase-design-active .pdp-version-option {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+/* Typography stays local to the product page. Inter is already loaded for the
+   storefront body, so the PDP needs no additional font request or font swap. */
+.pdp-page {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-feature-settings: 'kern' 1;
+}
+
+.pdp-page :is(h1, h2, h3, h4) {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.pdp-page h1 {
+  font-size: 24px;
+  line-height: 1.22;
+  letter-spacing: -0.032em;
+  overflow-wrap: break-word;
+}
+
+.pdp-page h2 {
+  font-size: 22px;
+  line-height: 1.27;
+}
+
+.pdp-page h3 {
+  font-size: 17px;
+  line-height: 1.32;
+}
+
+.pdp-page .gl-lbl {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-breadcrumb {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.pdp-page .pdp-price {
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdp-page .pdp-mrp {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-discount {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.pdp-page .pdp-variant-pill,
+.pdp-page .pdp-version-option {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+
+.pdp-page .pdp-variant-pill[aria-current='true'],
+.pdp-page .pdp-version-option[aria-pressed='true'] {
+  font-weight: 600;
+}
+
+.pdp-page .pdp-buy-actions button,
+.pdp-page .pdp-sticky-buy button {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.pdp-page .pdp-trust-heading {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-trust-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-trust-sub {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.pdp-page .pdp-trust-note {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.pdp-page summary {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+
+.pdp-page .pdp-description,
+.pdp-page .pdp-review-copy,
+.pdp-page .pdp-long-copy {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.65;
+}
+
+.pdp-page .pdp-review-author {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-photo-card span.font-mono,
+.pdp-page .pdp-photo-card p.font-mono {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+}
+
+.pdp-page .pdp-photo-card figcaption > p:first-child {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.pdp-page .gl-pcard h3 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pdp-page .gl-pcard .font-extrabold {
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .pdp-page h1 { font-size: 32px; }
+  .pdp-page h2 { font-size: 26px; }
+  .pdp-page h3 { font-size: 19px; }
+  .pdp-page .gl-lbl { font-size: 12px; }
+  .pdp-page .pdp-breadcrumb { font-size: 12.5px; }
+  .pdp-page .pdp-subtitle { font-size: 16px; }
+  .pdp-page .pdp-price { font-size: 30px; }
+  .pdp-page .pdp-mrp { font-size: 15px; }
+  .pdp-page .pdp-discount { font-size: 13px; }
+  .pdp-page .pdp-variant-pill,
+  .pdp-page .pdp-version-option { font-size: 13.5px; }
+  .pdp-page .pdp-buy-actions button,
+  .pdp-page .pdp-sticky-buy button { font-size: 15px; }
+  .pdp-page summary { font-size: 15px; }
+  .pdp-page .pdp-description,
+  .pdp-page .pdp-review-copy,
+  .pdp-page .pdp-long-copy { font-size: 15px; }
+  .pdp-page .pdp-review-author { font-size: 14px; }
+  .pdp-page .gl-pcard h3 { font-size: 14px; }
+}
+
+/* Optional floating purchase platform. This layer is removed completely when
+   floatingPdpPlatformDesign is false. The existing purchase logic is shared. */
+.pdp-page.pdp-floating-platform-active .pdp-product-layout {
+  align-items: start;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-floating-platform {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 4px;
+  background: #faf8f4;
+  box-shadow: 0 3px 10px rgb(20 20 20 / 0.045), 0 18px 38px rgb(20 20 20 / 0.055);
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-body {
+  background: transparent;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-heading {
+  display: block;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-premium.pdp-floating-platform h1 {
+  width: 100%;
+  min-height: 0;
+  font-size: clamp(25px, 6.6vw, 28px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  overflow-wrap: break-word;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-rating {
+  margin-top: 8px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-pricing {
+  margin-top: 14px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-actions {
+  position: absolute;
+  z-index: 20;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-action,
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 44px;
+  border: 0;
+  border-radius: 50% !important;
+  background: transparent;
+  color: rgb(20 20 20);
+  box-shadow: none;
+  backdrop-filter: none;
+  font-size: 10px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-action::before,
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist::before {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  content: '';
+  border: 1px solid rgb(20 20 20 / 0.08);
+  border-radius: 50%;
+  background: rgb(250 248 244 / 0.94);
+  box-shadow: 0 2px 5px rgb(20 20 20 / 0.09);
+  backdrop-filter: blur(8px);
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-action svg,
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist i {
+  position: relative;
+  width: 10px;
+  height: 10px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist i {
+  display: grid;
+  place-items: center;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist.bg-red-500 {
+  background: transparent;
+  color: white;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist.bg-red-500::before {
+  background: rgb(var(--gl-brand));
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-action:focus-visible,
+.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist:focus-visible {
+  outline: 2px solid rgb(var(--gl-brand));
+  outline-offset: 2px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-frame + div button {
+  height: 7px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-gallery-frame + div button.w-6 {
+  width: 18px;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-actions {
+  margin-top: 16px;
+}
+
+.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] {
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid rgb(var(--gl-hair));
+  border-bottom: 1px solid rgb(var(--gl-hair));
+  border-radius: 0 !important;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] li {
+  padding: 4px 0;
+  background: transparent;
+}
+
+.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] button[aria-expanded] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.pdp-page.pdp-floating-platform-active .pdp-purchase-actions .pdp-purchase-secondary {
+  background: transparent;
+}
+
+@media (min-width: 768px) {
+  .pdp-page.pdp-floating-platform-active .pdp-floating-platform {
+    padding: 28px;
+  }
+
+  .pdp-page.pdp-floating-platform-active .pdp-purchase-premium.pdp-floating-platform h1 {
+    font-size: clamp(30px, 2.5vw, 34px);
+  }
+}
+
+/* The purchase redesign is isolated behind premiumPdpPurchaseDesign. Turning
+   that flag off removes this class and restores the previous presentation. */
+.pdp-page .pdp-purchase-premium .pdp-purchase-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.pdp-page .pdp-purchase-premium h1 {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.032em;
+}
+
+.pdp-page .pdp-purchase-icons {
+  gap: 6px;
+  opacity: 0.82;
+}
+
+.pdp-page .pdp-purchase-icons:focus-within,
+.pdp-page .pdp-purchase-icons:hover {
+  opacity: 1;
+}
+
+.pdp-page .pdp-purchase-rating {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-purchase-pricing {
+  display: block;
+  margin-top: 14px;
+}
+
+.pdp-page .pdp-purchase-pricing > div:last-child {
+  display: none;
+}
+
+.pdp-page .pdp-purchase-price-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 10px;
+}
+
+.pdp-page .pdp-purchase-price-line .pdp-price {
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.pdp-page .pdp-purchase-saving {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.pdp-page .pdp-purchase-saving .pdp-mrp {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.pdp-page .pdp-purchase-saving .pdp-discount {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pdp-page .pdp-purchase-variant-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pdp-page .pdp-purchase-variant-meta span:last-child {
+  color: rgb(var(--gl-muted));
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.pdp-page .pdp-purchase-design-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  max-width: 180px;
+  padding-inline: 12px;
+  border-radius: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.pdp-page .pdp-purchase-design-option[aria-current='true'].line-through {
+  color: rgb(var(--gl-paper));
+  text-decoration-color: rgb(var(--gl-paper) / 0.75);
+}
+
+.pdp-page .pdp-purchase-design-option:focus-visible,
+.pdp-page .pdp-purchase-actions button:focus-visible,
+.pdp-page .pdp-purchase-rating:focus-visible {
+  outline: 2px solid rgb(var(--gl-brand));
+  outline-offset: 2px;
+}
+
+.pdp-page .pdp-purchase-options-scroll > div:first-child {
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.pdp-page .pdp-purchase-options-scroll .pdp-purchase-design-option {
+  scroll-snap-align: start;
+}
+
+.pdp-page .pdp-purchase-actions {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.pdp-page .pdp-purchase-actions .pdp-purchase-secondary {
+  flex: 0 0 36%;
+  min-width: 0;
+  height: 52px;
+  font-size: 14px;
+}
+
+.pdp-page .pdp-purchase-actions .pdp-purchase-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 52px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pdp-page .pdp-purchase-quantity {
+  height: 48px;
+  border-color: rgb(var(--gl-hair));
+}
+
+.pdp-page .pdp-purchase-quantity button {
+  width: 44px;
+  min-height: 44px;
+}
+
+.pdp-page .pdp-purchase-quantity span {
+  width: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdp-page .pdp-purchase-help {
+  justify-content: flex-start;
+  min-height: 44px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.pdp-page .pdp-purchase-help span span {
+  color: rgb(var(--gl-muted));
+  font-weight: 600;
+}
+
+.pdp-page .pdp-purchase-sticky-premium button {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .pdp-page .pdp-purchase-options-scroll .pdp-purchase-design-option {
+    width: calc((100vw - 50px) / 2);
+    max-width: none;
+  }
+
+  /* WhatsApp remains in the purchase section; the floating support button
+     otherwise covers variant choices and the mobile purchase action. */
+  #root:has(.pdp-purchase-premium .pdp-purchase-help) .un-help-fab {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .pdp-page .pdp-purchase-premium h1 { font-size: 32px; }
+  .pdp-page .pdp-purchase-price-line .pdp-price { font-size: 34px; }
+  .pdp-page .pdp-purchase-saving .pdp-mrp { font-size: 15px; }
+  .pdp-page .pdp-purchase-saving .pdp-discount { font-size: 13px; }
+  .pdp-page .pdp-purchase-variant-meta { font-size: 14px; }
+  .pdp-page .pdp-purchase-actions .pdp-purchase-primary { font-size: 16px; }
+}

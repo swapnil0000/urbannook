@@ -1,16 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
 import ScrollRow from '../../component/ScrollRow';
 import SaleBanner from '../../component/festive/SaleBanner';
-import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
-import { buildOfferLines } from '../../utils/productOfferLines';
 import { ShopFilterSidebar, ShopFilterButton, ShopSort, ActiveFilterChips } from '../../component/ShopFilters';
 import { useSessionState } from '../../hooks/useSessionState';
-import { EMPTY_FILTERS, applyShopFilters, sortShopItems, demandChips, recentSalesChips } from '../../utils/shopFilters';
+import { EMPTY_FILTERS, applyShopFilters, sortShopItems } from '../../utils/shopFilters';
 import { toItems } from '../../utils/shopItems';
 import { shopPills } from '../../utils/shopPills';
 import { CATEGORY_LABEL } from '../../utils/categoryUrl';
@@ -61,19 +59,8 @@ const CategoryPage = () => {
   // Availability / price filters: client state only (see ShopFilters), reset per category.
   const [filters, setFilters] = useSessionState(`shop:${slug}:filters`, EMPTY_FILTERS);
   const [sort, setSort] = useSessionState(`shop:${slug}:sort`, 'featured');
-  // Live combo benefit per product, for the card's offer line (cached query).
-  const { data: comboRes } = useGetHomeComboOffersQuery();
-  // Names across the whole catalogue (same cached list as the header), so a
-  // reward line can name a product from another category ("with a Lamp").
-  const { data: allProdRes } = useGetProductsQuery({ page: 1, limit: 24 });
-  const offerLines = useMemo(() => {
-    const list = allProdRes?.data?.listofPublishedProducts || allProdRes?.data?.products || category?.products || [];
-    return buildOfferLines(comboRes?.data?.combos || [], new Map(list.map((x) => [String(x.productId), x.productName])));
-  }, [comboRes, allProdRes, category]);
-  const chips = useMemo(() => demandChips(allItems), [allItems]);
   // Filters and sort start fresh on every category.
   const items = useMemo(() => sortShopItems(applyShopFilters(allItems, filters), sort), [allItems, filters, sort]);
-  const recentSales = useMemo(() => recentSalesChips(items), [items]);
   const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const page = Math.min(Math.max(1, parseInt(searchParams.get('page'), 10) || 1), totalPages);
   const pageItems = useMemo(() => items.slice((page - 1) * PER_PAGE, page * PER_PAGE), [items, page]);
@@ -106,7 +93,7 @@ const CategoryPage = () => {
     );
   }
 
-  const { name, indexable, itemCount } = category;
+  const { name, indexable } = category;
   const copy = pageCopy(category);
   const basePath = `/category/${category.slug}`;
   const pagePath = (n) => (n > 1 ? `${basePath}?page=${n}` : basePath);
@@ -134,7 +121,7 @@ const CategoryPage = () => {
   ];
 
   return (
-    <div className="font-inter bg-surface text-ink min-h-screen">
+    <div className="shop-listing-page font-inter bg-paper text-ink min-h-screen">
       <SEOHead
         title={page > 1 ? `${title} - Page ${page}` : title}
         description={description}
@@ -145,32 +132,31 @@ const CategoryPage = () => {
         structuredData={structuredData}
       />
 
-      <div className="max-w-[1280px] mx-auto px-5 pt-10">
-        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
+      <div className="max-w-[1280px] mx-auto px-5 pt-5 md:pt-8">
+        <nav aria-label="Breadcrumb" className="text-[12px] md:text-[13px] text-faint mb-3">
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
-        <SaleBanner className="mb-5" />
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
-        <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
-
-
+        <SaleBanner className="mb-4" />
+        <h1 className="font-inter text-[32px] md:text-[44px] font-semibold leading-tight tracking-tight">{copy.h1}</h1>
         {pills.length > 0 && (
-          <ScrollRow className="mt-6" activeKey={slug}>
-              <Link to="/products" className="gl-press px-4 py-2 rounded-full text-sm font-semibold bg-white border border-hair hover:border-ink">All</Link>
+          <nav aria-label="Shop categories">
+            <ScrollRow className="mt-4" activeKey={slug} hideControls>
+              <Link to="/products" className="shop-category-pill gl-press flex min-h-10 shrink-0 items-center justify-center px-3 py-2 text-center text-[13px] font-medium leading-tight whitespace-nowrap bg-white border border-hair hover:border-ink">All</Link>
               {/* same fixed order as Shop All; the current one is highlighted in place */}
               {pills.map((c) => (
                 <Link key={c.slug} to={`/category/${c.slug}`} aria-current={c.slug === slug ? 'page' : undefined}
-                  className={`gl-press px-4 py-2 rounded-full text-sm font-semibold border ${c.slug === slug ? 'bg-brand text-white border-brand' : 'bg-white border-hair hover:border-ink'}`}>{CATEGORY_LABEL[c.name] || c.name}</Link>
+                  className={`shop-category-pill gl-press flex min-h-10 shrink-0 items-center justify-center px-3 py-2 text-center text-[13px] font-medium leading-tight whitespace-nowrap border ${c.slug === slug ? 'bg-brand text-white border-brand' : 'bg-white border-hair hover:border-ink'}`}>{CATEGORY_LABEL[c.name] || c.name}</Link>
               ))}
-          </ScrollRow>
+            </ScrollRow>
+          </nav>
         )}
       </div>
 
-      <section className="max-w-[1280px] mx-auto px-5 py-8 flex gap-8 [overflow-anchor:none]">
+      <section className="max-w-[1280px] mx-auto px-5 pt-5 pb-28 flex gap-8 [overflow-anchor:none]">
         <ShopFilterSidebar items={allItems} filters={filters} setFilters={setFilters} />
         <div className="flex-1 min-w-0">
-        <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="mb-3 flex items-center justify-between gap-2 sm:gap-3">
           <ShopFilterButton items={allItems} filters={filters} setFilters={setFilters} resultCount={items.length} />
           <p className="ml-auto whitespace-nowrap text-xs text-muted sm:text-sm">{items.length} of {allItems.length} items</p>
           <ShopSort value={sort} onChange={setSort} />
@@ -182,20 +168,15 @@ const CategoryPage = () => {
             <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="mt-3 text-sm font-bold text-brand hover:underline">Clear filters</button>
           </div>
         )}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-          {pageItems.map(({ key, p, href, badge }, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-4">
+          {pageItems.map(({ key, p, href }, i) => (
             <RevealCard key={key} index={i}>
               <UnProductCard
                 p={p}
                 href={href}
-                badge={badge}
-                demand={sort === 'trending' ? 'trending' : chips.get(key)} trendCount={Number(p.variantDetails?.[0]?.soldRecent || 0)}
-                recentSalesUnits={recentSales.get(key)}
-                offerLine={offerLines.get(String(p.productId))}
                 index={i}
                 listId={`category_${category.slug}`}
                 listName={`Category: ${name}`}
-                showWishlist={false}
               />
             </RevealCard>
           ))}

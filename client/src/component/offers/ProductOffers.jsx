@@ -37,7 +37,7 @@ const offerInstead = (p, cartPromotions) => {
   return other ? { promo: other, upgrade: false } : null;
 };
 
-const ProductOffers = ({ productId, className = '', onApply, disabled = false, cartTotal = 0, appliedIds = [], cartPromotions = [] }) => {
+const ProductOffers = ({ productId, className = '', compact = false, onApply, disabled = false, cartTotal = 0, appliedIds = [], cartPromotions = [] }) => {
   const { data } = useGetProductPromotionsQuery(productId, { skip: !productId });
   const all = (data?.data?.promotions || [])
     .filter((p) => p.fullyFunctional !== false)
@@ -50,7 +50,8 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
     .map((p) => ({ p, instead: offerInstead(p, cartPromotions) }))
     .sort((a, b) => Boolean(a.instead) - Boolean(b.instead));
   if (!offers.length && !gifts.length) return null;
-  const hidden = expanded ? 0 : Math.max(0, offers.length - COLLAPSED);
+  const visibleCount = compact ? 1 : COLLAPSED;
+  const hidden = expanded ? 0 : Math.max(0, offers.length - visibleCount);
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -108,7 +109,7 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
           );
         })}
       </ul>
-      {offers.length > COLLAPSED && (
+      {offers.length > visibleCount && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}

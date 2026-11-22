@@ -3,17 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../../store/slices/cartSlice';
 import SEOHead from '../../component/SEOHead';
-import { productImg, firstVariant, inr } from '../../component/UnProductCard';
+import { productImg, firstVariant, inr } from '../../utils/productCardData';
 import HomeProductCard from '../../component/HomeProductCard';
+import { orderedSelection, reviewPhotos } from '../../utils/mediaCuration';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
 import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
 import HeroBanner from '../../component/HeroBanner';
-import { useGetTestimonialsQuery, useGetGoogleReviewsQuery } from '../../store/api/testimonialsApi';
+import { testimonialsApi, useGetTestimonialsQuery, useGetGoogleReviewsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
-import { useGetPublicStatsQuery, ordersShown, shownCount, shownRating } from '../../store/api/statsApi';
+import { useGetPublicStatsQuery, useGetPhotoReviewsQuery, ordersShown, shownCount, shownRating } from '../../store/api/statsApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 import { sortByCategoryPriority } from '../../utils/categoryUrl';
@@ -100,30 +101,35 @@ const CountUp = ({ to = 0, suffix = '', duration = 1.4 }) => {
   return <span ref={ref}>{val}{suffix}</span>;
 };
 
-/** Photo-led review card for the testimonial wall. */
-const ReviewCard = ({ t, img, tag, onClick }) => (
-  <figure
-    onClick={onClick}
-    className="group relative shrink-0 w-[288px] sm:w-[330px] aspect-[5/6] overflow-hidden bg-hair mr-4 md:mr-5 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-24px_rgba(20,20,20,0.55)]"
-  >
-    <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
-    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-    <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">{t.source === 'google' ? 'G · Google review' : '✓ Verified'}</span>
-    <figcaption className="absolute inset-x-3 bottom-3 p-4 bg-paper/95 backdrop-blur">
-      <div className="flex items-center gap-2.5 mb-2.5">
-        {t.photo
-          ? <img src={t.photo} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover shrink-0" />
-          : <span className="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-archivo font-extrabold text-sm shrink-0">{(t.userName || 'U').charAt(0).toUpperCase()}</span>}
-        <div className="min-w-0 flex-1">
-          <p className="gl-lbl text-[10px] text-ink truncate">{t.userName}</p>
-          <span className="text-star text-[11px] leading-none">{stars(t.rating)}</span>
-        </div>
-        <span className="gl-lbl text-[8px] text-brand shrink-0 max-w-[92px] truncate">{tag} →</span>
+/** Review card: 4:5 photo block (up to 3 photos: full / split / one big + two stacked), name + stars bar, fixed-height caption. */
+const ReviewCard = ({ t, img, imgs, tag, onClick }) => {
+  const shots = (imgs?.length ? imgs : [img]).filter(Boolean).slice(0, 3);
+  const photo = (src, cls = '') => <img key={src} src={src} alt="" loading="lazy" decoding="async" className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.035] ${cls}`} onError={onImgErr} />;
+  return (
+    <figure onClick={onClick} className="group shrink-0 w-[199px] sm:w-[230px] mr-4 md:mr-5 flex flex-col cursor-pointer">
+      <div className="relative aspect-[4/5] overflow-hidden bg-hair">
+        {shots.length === 1 && photo(shots[0], 'absolute inset-0')}
+        {shots.length === 2 && <div className="grid h-full grid-cols-2 gap-px bg-paper">{shots.map((src) => <div key={src} className="overflow-hidden">{photo(src)}</div>)}</div>}
+        {shots.length === 3 && (
+          <div className="grid h-full grid-cols-[3fr_2fr] grid-rows-2 gap-px bg-paper">
+            <div className="row-span-2 overflow-hidden">{photo(shots[0])}</div>
+            <div className="overflow-hidden">{photo(shots[1])}</div>
+            <div className="overflow-hidden">{photo(shots[2])}</div>
+          </div>
+        )}
+        <span className="absolute top-2.5 right-2.5 font-mono uppercase text-[9px] tracking-[0.1em] leading-none bg-ink/70 text-paper px-1.5 py-1">{t.source === 'google' ? 'Google' : 'Verified'}</span>
       </div>
-      <p className="text-ink text-[13px] leading-snug line-clamp-3">“{t.content}”</p>
-    </figcaption>
-  </figure>
-);
+      <div className="flex items-center justify-between gap-2 bg-ink px-2.5 py-2">
+        <p className="font-mono uppercase text-[10px] tracking-[0.12em] text-paper truncate">{t.userName}</p>
+        <span className="text-star text-[10px] leading-none whitespace-nowrap">{stars(t.rating)}</span>
+      </div>
+      <div className="h-[98px] flex flex-col gap-1.5 pt-2.5 border-b border-hair">
+        <p className="text-muted text-[11.5px] leading-relaxed line-clamp-3">{t.content}</p>
+        <p className="mt-auto mb-2.5 font-mono uppercase text-[10px] tracking-[0.12em] text-ink truncate transition-colors group-hover:text-brandHi">{tag} →</p>
+      </div>
+    </figure>
+  );
+};
 
 /** Slowly rotating circular-text stamp - an editorial accent to fill space. */
 const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => (
@@ -751,6 +757,10 @@ const HomePage = () => {
   const { data: heroRes } = useGetHeroBannerQuery();
   const [heroBroken, setHeroBroken] = useState(false);
   const heroSlides = heroBroken ? [] : (heroRes?.data?.slides || []);
+  const homeDisplay = heroRes?.data?.display || {};
+  const selectProducts = (list, selection) => Array.isArray(selection)
+    ? selection.map(({ id, image }) => ({ id, image, product: list.find((product) => product.productId === id) })).filter((item) => item.product)
+    : list.map((product) => ({ id: product.productId, image: null, product }));
 
   /* products?featured=true currently answers "No Published Product found"
      even though a product does carry the tag, so this cannot be the only
@@ -806,6 +816,8 @@ const HomePage = () => {
   const MIN_TAGGED = 2;
   const bestsellers = byTag('best_seller').slice(0, 8);
   const arrivals = byTag('new_arrival').slice(0, 8);
+  const shownBestsellers = selectProducts(bestsellers, homeDisplay.bestsellers);
+  const shownCollectionProducts = selectProducts(products, homeDisplay.collectionProducts);
 
   // Sizing for the single "Collection" grid so 2-7 products never look stranded.
   const colsFor = (k) => (k <= 2 ? 'grid-cols-2 max-w-[720px]'
@@ -813,16 +825,25 @@ const HomePage = () => {
     : 'grid-cols-2 lg:grid-cols-4');
   const collectionCols = colsFor(n);
 
-  const collections = useMemo(() => {
+  const collections = (() => {
     const seen = [];
     products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
     const soon = [{ name: 'Wall Posters', img: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80', soon: true }, { name: 'Desk Décor', img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80', soon: true }];
     // Same order as the header (Gaming in Superheroes' old slot), then the "soon" fillers.
-    return [...sortByCategoryPriority(seen, (c) => c.name), ...soon].slice(0, 4);
-  }, [products]);
+    const automatic = [...sortByCategoryPriority(seen, (c) => c.name), ...soon].slice(0, 4);
+    if (!Array.isArray(homeDisplay.collections)) return automatic;
+    return homeDisplay.collections.filter(({ id }) => seen.some((c) => c.name === id)).map(({ id, image }) => ({ name: id, img: image }));
+  })();
   const hasRealCollections = collections.filter((c) => !c.soon).length >= 3;
 
-  const { data: testRes } = useGetTestimonialsQuery();
+  // The review wall makes no API call and loads no image until the shopper scrolls near it.
+  const wallRef = useRef(null);
+  const nearWall = useInView(wallRef, { once: true, margin: '700px 0px 700px 0px' });
+  const { data: photoRes, isSuccess: photoDone } = useGetPhotoReviewsQuery(undefined, { skip: !nearWall });
+  const photoReviews = photoRes?.data?.reviews || [];
+  // Testimonials only stand in when there are no photo reviews; the server-prefetched copy is read without a request.
+  useGetTestimonialsQuery(undefined, { skip: !(nearWall && photoDone && photoReviews.length === 0) });
+  const { data: testRes } = testimonialsApi.endpoints.getTestimonials.useQueryState();
   const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
   const fallbackReviews = [
     { userName: 'Aryan', content: "The red glow is unreal on a late-night setup. Way cooler in person.", rating: 5 },
@@ -830,12 +851,34 @@ const HomePage = () => {
     { userName: 'Kabir', content: "Pen stand is tiny but adorable. Desk finally looks intentional.", rating: 4 },
   ];
   // Google reviews (4★+, with text) lead the wall; our own approved testimonials follow.
-  const { data: googleRes } = useGetGoogleReviewsQuery();
+  const { data: googleRes } = useGetGoogleReviewsQuery(undefined, { skip: !nearWall });
   const google = googleRes?.data?.configured ? googleRes.data : null;
   const googleReviews = (google?.reviews || []).filter((r) => r.rating >= 4)
     .map((r) => ({ userName: r.author, content: r.text, rating: r.rating, photo: r.authorPhoto, url: r.url || google.mapsUrl, source: 'google' }));
   const ownReviews = [...googleReviews, ...testimonials];
   const reviews = ownReviews.length ? ownReviews : fallbackReviews;
+  // The wall = every approved review with a customer photo (GET /stats/photo-reviews); until it loads, the list above.
+  const curatedWall = Array.isArray(homeDisplay.reviewPhotos)
+    ? orderedSelection(reviewPhotos(photoReviews), homeDisplay.reviewPhotos, (item) => item.id, (item) => item.image).map(({ image, review }) => ({
+      t: { userName: review.userName, content: review.desc, rating: review.rating, source: review.source }, img: image, imgs: [image], tag: review.productName || 'UrbanNook', open: () => review.productId && navigate(`/product/${review.productId}`),
+    })) : null;
+  const wall = curatedWall ?? (photoReviews.length
+    ? photoReviews.map((r) => ({
+      t: { userName: r.userName, content: r.desc, rating: r.rating, source: r.source },
+      img: r.images[0],
+      imgs: r.images,
+      tag: r.productName || 'UrbanNook',
+      open: () => r.productId && navigate(`/product/${r.productId}`),
+    }))
+    : reviews.map((t, i) => {
+      const prod = products.length ? products[i % products.length] : null;
+      return {
+        t,
+        img: prod ? productImg(prod) : heroImg,
+        tag: t.source === 'google' ? 'Read on Google' : prod?.productName || 'UrbanNook',
+        open: t.source === 'google' && t.url ? () => window.open(t.url, '_blank', 'noopener') : () => prod && navigate(`/product/${prod.productId}`),
+      };
+    }));
 
   useEffect(() => {
     if (products.length) trackViewItemList?.({ listName: 'Home', listId: 'home', items: products.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
@@ -883,7 +926,7 @@ const HomePage = () => {
       {/* ══ PRODUCTS - adaptive to catalog size ══ */}
       {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
       {/* sale header (price drops) + combo offers as one section */}
-      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} />} />}
+      {!isFewProducts && shownBestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} selection={homeDisplay.festiveDeals} />} />}
       <RangoliDivider />
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */
@@ -892,20 +935,20 @@ const HomePage = () => {
             <SecHead index="01" kicker="The Collection" title="Everything we make" onView={() => navigate('/products')} />
             {isLoading
               ? <div className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`}>{[...Array(Math.max(n, 2))].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{products.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
+              : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{shownCollectionProducts.map(({ product: p, image }, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} image={image} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
             <Reveal className="text-center mt-4 md:mt-6">
               <p className="text-muted text-sm max-w-md mx-auto">A tight, made-to-order range - no filler, no warehouse leftovers. <b className="text-ink">More drops on the way.</b></p>
             </Reveal>
           </div>
         </section>
-      ) : bestsellers.length >= MIN_TAGGED ? (
+      ) : shownBestsellers.length > 0 ? (
         /* Full catalog: differentiated, tag-driven Bestsellers grid. */
         <section className="bg-surface border-y border-hair mt-4">
           <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
             <SecHead index="01" kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
             {isLoading
               ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${colsFor(bestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{bestsellers.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
+              : <Stagger className={`grid ${colsFor(shownBestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{shownBestsellers.map(({ product: p, image }, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} image={image} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
           </div>
         </section>
       ) : null}
@@ -1008,7 +1051,7 @@ const HomePage = () => {
       </section>
 
       {/* ══ SHOP BY COLLECTION - only when there are real categories to browse ══ */}
-      {!isFewProducts && hasRealCollections && (
+      {!isFewProducts && (hasRealCollections || (Array.isArray(homeDisplay.collections) && collections.length > 0)) && (
         <section className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
           <SecHead index="03" kicker="Find Your Corner" title="Shop by Collection" />
           <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4" stagger={0.07}>
@@ -1048,7 +1091,8 @@ const HomePage = () => {
       )} */}
 
       {/* ══ TESTIMONIALS - two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
-      <section className="bg-paper py-4 md:py-20 overflow-hidden">
+      <div ref={wallRef} aria-hidden="true" className="h-px" />
+      {(!Array.isArray(homeDisplay.reviewPhotos) || wall.length > 0) && <section className="bg-paper py-4 md:py-20 overflow-hidden">
         <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
           <div>
             <Kicker>{google?.rating ? `★ ${google.rating.toFixed(1)} on Google · ${google.total} reviews` : `★ ${shownRating(stats)} · ${shownCount(stats, 'totalReviews')}+ reviews`}</Kicker>
@@ -1063,14 +1107,11 @@ const HomePage = () => {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-14 md:w-28 bg-gradient-to-l from-paper to-transparent z-10" />
 
           {/* single fast row */}
-          <div className="un-marquee" style={{ animationDuration: '22s' }}>
+          {/* ~5s per card keeps the drift readable */}
+          <div className="un-marquee" style={{ animationDuration: `${Math.max(22, wall.length * 5)}s` }}>
             {[0, 1].map((dup) => (
               <div key={dup} className="flex shrink-0" aria-hidden={dup === 1}>
-                {reviews.map((t, i) => {
-                  const prod = products.length ? products[i % products.length] : null;
-                  const open = t.source === 'google' && t.url ? () => window.open(t.url, '_blank', 'noopener') : () => prod && navigate(`/product/${prod.productId}`);
-                  return <ReviewCard key={i} t={t} img={prod ? productImg(prod) : heroImg} tag={t.source === 'google' ? 'Read on Google' : prod?.productName || 'UrbanNook'} onClick={open} />;
-                })}
+                {wall.map((w, i) => <ReviewCard key={i} t={w.t} img={w.img} imgs={w.imgs} tag={w.tag} onClick={w.open} />)}
               </div>
             ))}
           </div>
@@ -1083,7 +1124,7 @@ const HomePage = () => {
             <span className="w-full text-center text-[10px] text-faint">Google reviews shown as provided by Google.</span>
           </div>
         )}
-      </section>
+      </section>}
 
       {/* ══ FAQ ══ */}
       <FaqSection onContact={() => navigate('/contact-us')} />

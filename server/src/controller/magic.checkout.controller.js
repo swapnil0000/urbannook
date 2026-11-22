@@ -8,7 +8,9 @@ import {
 } from "../services/shipping.service.js";
 import { validateNewCoupon, getUserCouponIdentity } from "../services/coupon.code.service.js";
 import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { selectMagicSheetCoupons, resolveMagicCouponIdentity } from "../utils/magicPromotions.util.js";
+import { selectMagicSheetCoupons, resolveMagicCouponIdentity, couponUnlocksFreeShipping } from "../utils/magicPromotions.util.js";
+import { getActivePromotions } from "../utils/promotionEngine.util.js";
+import Product from "../model/product.model.js";
 import {
   verifyMagicCallback,
   toRazorpayServiceableAddress,
@@ -389,6 +391,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     items: 1,
     guestInfo: 1,
     senderMobile: 1,
+    freeShippingUnlocked: 1,
   });
 
   if (order?.coupon?.isApplied) {
@@ -442,16 +445,42 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     return fail("This coupon gives no discount on your cart.");
   }
 
-  console.log(`${TAG}[applyPromotion] "${cleanCode}" ok — ₹${discountRupees} off ₹${subtotalRupees}`);
+  // A coupon linked to a free_shipping Promotion (e.g. UNFREESHIPPING) also covers the delivery fee.
+  // Razorpay adds the fee from the shipping callback after this, which can't see the coupon, so the
+  // fee is folded into the discount instead (the callback keeps charging it: no double waiver).
+  let shippingCoveredRupees = 0;
+  // the shipping callback also waives the fee on its own above the admin threshold: don't cover it twice
+  const freeShippingConfig = await getFreeShippingConfig();
+  const thresholdFree = freeShippingConfig.isActive && subtotalRupees >= freeShippingConfig.thresholdAmount;
+  if (!order?.freeShippingUnlocked && !thresholdFree) {
+    const promoItems = magicOrderItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku }));
+    const products = await Product.find(
+      { productId: { $in: promoItems.map((i) => i.productId) } },
+      { productId: 1, productCategory: 1, productSubCategory: 1, tags: 1 },
+    ).lean();
+    const productMeta = new Map(products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]));
+    const unlocks = couponUnlocksFreeShipping(await getActivePromotions(), cleanCode, promoItems, {
+      subtotal: subtotalRupees,
+      productMeta,
+      isGuest: !!order?.isGuestOrder,
+    });
+    if (unlocks) {
+      // never more than the order can absorb: Razorpay rejects a promotion above the order amount
+      shippingCoveredRupees = Math.max(0, Math.min(staticShippingCharge(subtotalRupees), subtotalRupees - discountRupees));
+    }
+  }
+  const totalOffRupees = discountRupees + shippingCoveredRupees;
+
+  console.log(`${TAG}[applyPromotion] "${cleanCode}" ok — ₹${discountRupees} off ₹${subtotalRupees}${shippingCoveredRupees ? ` + ₹${shippingCoveredRupees} shipping covered = ₹${totalOffRupees}` : ""}`);
 
   return res.status(200).json({
     promotion: {
       reference_id: coupon.couponId || cleanCode,
       type: "coupon",
       code: cleanCode,
-      value: Math.round(discountRupees * 100), // PAISE
+      value: Math.round(totalOffRupees * 100), // PAISE
       value_type: "fixed_amount", // we resolve percentages ourselves
-      description: coupon.title || `₹${discountRupees} off`,
+      description: shippingCoveredRupees ? `${coupon.title || `₹${discountRupees} off`} (free delivery)` : coupon.title || `₹${discountRupees} off`,
     },
   });
 });
