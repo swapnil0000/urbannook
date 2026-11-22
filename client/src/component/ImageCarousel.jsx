@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  *
  * Two layouts:
  *  - default: one full-width framed image at a time (used by the main gallery)
+ *  - thumbs:  (default layout, desktop only) a vertical strip of every image beside the frame; click jumps to it
  *  - peek:    smaller square cards, several visible at once, no frame/radius
  *             (used by "Look closer" and "Seen in real setups")
  */
@@ -23,6 +24,8 @@ export default function ImageCarousel({
   peek = false,
   slideClass = 'w-[64%] sm:w-56',
   priority = false, // first slide is the page's LCP image → fetchpriority=high
+  thumbs = false, // desktop thumbnail strip beside the frame (phones keep dots + swipe)
+  hideCounter = false,
 }) {
   const trackRef = useRef(null);
   const [index, setIndex] = useState(0);
@@ -214,38 +217,62 @@ export default function ImageCarousel({
     );
   }
 
-  // DEFAULT — one full-width framed image at a time.
+  // DEFAULT — one full-width framed image at a time (+ a desktop thumbnail strip when `thumbs`).
+  const showThumbs = thumbs && count > 1;
   return (
     <div className={className} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className={`relative  overflow-hidden border border-hair bg-surface ${aspectClass}`}>
-        <div
-          ref={trackRef}
-          onScroll={onScroll}
-          {...pauseOnInteract}
-          className="flex h-full w-full overflow-x-auto gl-hscroll snap-x snap-mandatory"
-        >
-          {slides.map((src, k) => Slide(src, k, 'w-full h-full snap-center'))}
-        </div>
-
-        {count > 1 && (
-          <>
-            <button
-              onClick={() => scrollToIndex(index - 1)}
-              aria-label="Previous image"
-              className="hidden md:grid place-items-center absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 backdrop-blur text-ink text-xl shadow hover:bg-white transition z-10"
-            >‹</button>
-            <button
-              onClick={() => scrollToIndex(index + 1)}
-              aria-label="Next image"
-              className="hidden md:grid place-items-center absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 backdrop-blur text-ink text-xl shadow hover:bg-white transition z-10"
-            >›</button>
-            <span className="absolute top-3 right-3 z-10 bg-ink/70 text-white text-[11px] font-bold px-2 py-1 rounded-full tabular-nums">
-              {index + 1}/{count}
-            </span>
-          </>
+      <div className={showThumbs ? 'lg:flex lg:gap-3' : ''}>
+        {showThumbs && (
+          // absolute inner box: the strip scrolls inside the frame's height instead of stretching the row
+          <div className="relative hidden lg:block w-[72px] shrink-0" aria-label="Product photos">
+            <div className="absolute inset-0 flex flex-col gap-2 overflow-y-auto gl-hscroll">
+              {images.map((src, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => scrollToIndex(i)}
+                  aria-label={`Show image ${i + 1}`}
+                  aria-current={i === index ? 'true' : undefined}
+                  className={`pdp-gallery-thumb relative aspect-square w-full shrink-0 overflow-hidden border bg-surface transition-colors ${i === index ? 'border-ink' : 'border-hair opacity-70 hover:opacity-100 hover:border-ink'}`}
+                >
+                  <img src={src} alt="" loading="lazy" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-cover" onError={onImgErr} />
+                </button>
+              ))}
+            </div>
+          </div>
         )}
+        <div className="min-w-0 flex-1">
+          <div className={`pdp-gallery-frame relative overflow-hidden border border-hair bg-surface ${aspectClass}`}>
+            <div
+              ref={trackRef}
+              onScroll={onScroll}
+              {...pauseOnInteract}
+              className="flex h-full w-full overflow-x-auto gl-hscroll snap-x snap-mandatory"
+            >
+              {slides.map((src, k) => Slide(src, k, 'w-full h-full snap-center'))}
+            </div>
+
+            {count > 1 && (
+              <>
+                <button
+                  onClick={() => scrollToIndex(index - 1)}
+                  aria-label="Previous image"
+                  className="hidden md:grid place-items-center absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 backdrop-blur text-ink text-xl shadow hover:bg-white transition z-10"
+                >‹</button>
+                <button
+                  onClick={() => scrollToIndex(index + 1)}
+                  aria-label="Next image"
+                  className="hidden md:grid place-items-center absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 backdrop-blur text-ink text-xl shadow hover:bg-white transition z-10"
+                >›</button>
+                {!hideCounter && <span className="absolute top-3 right-3 z-10 bg-ink/70 text-white text-[11px] font-bold px-2 py-1 rounded-full tabular-nums">
+                  {index + 1}/{count}
+                </span>}
+              </>
+            )}
+          </div>
+          <div className={showThumbs ? 'lg:hidden' : ''}>{Dots}</div>
+        </div>
       </div>
-      {Dots}
     </div>
   );
 }

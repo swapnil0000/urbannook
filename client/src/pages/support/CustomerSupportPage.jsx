@@ -213,7 +213,7 @@ const CustomerSupportPage = () => {
                                     </div>
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
+                                        <p className="text-brand font-mono text-sm mb-2 font-bold inline-flex items-center gap-2"><i className="fa-brands fa-whatsapp" aria-hidden="true" />+91 91240 81005</p>
                                         <p className="text-xs text-gray-500">Mon-Sat, 9AM - 7PM</p>
                                     </div>
                                 </div>
@@ -241,7 +241,7 @@ const CustomerSupportPage = () => {
                                     </div>
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
+                                        <p className="text-brand font-mono text-sm mb-2 font-bold inline-flex items-center gap-2"><i className="fa-brands fa-whatsapp" aria-hidden="true" />+91 91240 81005</p>
                                         <p className="text-xs text-gray-500">Available 24/7</p>
                                     </div>
                                 </div>

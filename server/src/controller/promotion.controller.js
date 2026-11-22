@@ -1,4 +1,5 @@
 import { ApiRes } from "../utils/index.js";
+import { packCards, stripSheetData } from "../utils/cardTable.util.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError } from "../utils/errors.js";
 import Product from "../model/product.model.js";
@@ -648,8 +649,8 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const appliedPromotionIds = appliedPromotionIdsFromResult(matchedResult);
 
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "checkout", appliedPromotionIds });
-  // freeShipping: a free_shipping promotion matched - the page must show what the
-  // order will charge (no delivery, no COD fee), same as rp.payment.controller.
+  // A matched free_shipping promotion, including coupon-linked ones, waives
+  // delivery and the COD fee in the checkout preview and final order.
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, freeShipping: !!matchedResult.freeShipping }, true));
 });
 
@@ -840,7 +841,9 @@ const pdpCardOf = (promo) => {
 // same "hypothetical cart" convention getProductDisplayController already
 // uses for the PDP. mrp/price/save are the real, computed numbers; nothing
 // here is typed in by the admin.
-const getHomeDisplayController = asyncHandler(async (_req, res) => {
+const getHomeDisplayController = asyncHandler(async (req, res) => {
+  // ?lite=1 / ?dedupe=1: smaller payloads, see utils/cardTable.util.js.
+  const out = (data) => (req.query.lite === "1" ? stripSheetData(data) : req.query.dedupe === "1" ? packCards(data) : data);
   const all = await getActivePromotions();
 
   // "reward" cards advertise a ladder offer ("Buy any 2 katana, get a Dual
@@ -991,7 +994,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
     .filter((c) => c.productIds.length === 2);
 
   if (candidates.length === 0) {
-    return res.status(200).json(new ApiRes(200, "OK", { combos: rewardCards.sort((a, b) => a.order - b.order || b.priority - a.priority) }, true));
+    return res.status(200).json(new ApiRes(200, "OK", out({ combos: rewardCards.sort((a, b) => a.order - b.order || b.priority - a.priority) }), true));
   }
 
   const allProductIds = [...new Set(candidates.flatMap((c) => c.productIds))];
@@ -1099,7 +1102,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
     .concat(rewardCards)
     .sort((a, b) => a.order - b.order || b.priority - a.priority);
 
-  return res.status(200).json(new ApiRes(200, "OK", { combos: display }, true));
+  return res.status(200).json(new ApiRes(200, "OK", out({ combos: display }), true));
 });
 
 export {

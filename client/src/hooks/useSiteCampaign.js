@@ -19,6 +19,17 @@ import { getApiUrl } from '../config/appUrls';
  * its dates/enabled flag; ?festivePreview=off leaves preview.
  */
 
+// Callers asking for the same URL at the same moment share one request.
+const inflight = new Map();
+const sharedFetch = (url) => {
+  if (!inflight.has(url)) {
+    inflight.set(url, fetch(url, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .finally(() => inflight.delete(url)));
+  }
+  return inflight.get(url);
+};
+
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 const REFOCUS_REFETCH_AFTER_MS = 60 * 1000;
 const PREVIEW_KEY = 'un_festive_preview';
@@ -78,32 +89,31 @@ export function SiteCampaignProvider({ children }) {
   const lastLoad = useRef(0);
   const previewToken = useRef(null);
 
-  const load = useCallback(async (signal) => {
+  const load = useCallback(async () => {
     lastLoad.current = Date.now();
     try {
       const token = previewToken.current;
       const url = token
         ? `${getApiUrl()}/site-campaign/preview/${token.split('.')[0]}?key=${token.split('.')[1]}`
         : `${getApiUrl()}/site-campaign/active`;
-      const res = await fetch(url, { cache: 'no-store', signal });
-      if (!res.ok) { setState({ campaign: null, offset: 0 }); return; }
-      const json = await res.json();
+      const json = await sharedFetch(url);
+      // A failed answer says nothing about the campaign: keep what is shown.
+      if (!json) return;
       const serverTime = Date.parse(json?.data?.serverTime);
       setState({
         campaign: json?.data?.campaign || null,
         // server clock minus local clock; add to Date.now() to estimate server time
         offset: Number.isFinite(serverTime) ? serverTime - Date.now() : 0,
       });
-    } catch (e) {
-      if (e?.name !== 'AbortError') setState((s) => s);
+    } catch {
+      /* keep the current state */
     }
   }, []);
 
+  // StrictMode (dev) runs this twice; both runs share one request.
   useEffect(() => {
     previewToken.current = readPreviewToken();
-    const ctl = new AbortController();
-    load(ctl.signal);
-    return () => ctl.abort();
+    load();
   }, [load]);
 
   // Coming back to a long-idle tab re-asks the server.

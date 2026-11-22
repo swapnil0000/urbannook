@@ -311,3 +311,10 @@ share of it. Not changed by the storefront team (rule 9) — please consider:
    load; a longer delay (or `requestIdleCallback`) would move it out of the measured window.
 3. **Clarity** ≈ 25 KB but a 200 ms long task on /products. Already deferred 3 s; consider sampling
    (e.g. load for 30 % of sessions).
+# Product-level PDP display settings
+
+The product editor now supports optional section visibility, lower-section order, and visible heading overrides through `pdpDisplay` on each product. Product URLs, canonicals, metadata, ProductGroup schema, and analytics utilities are unchanged. When the FAQ is hidden, its FAQPage JSON-LD is also omitted. Review aggregate schema still comes from underlying verified review data even when the on-page review panel is hidden. The Admin-only draft preview uses a URL fragment (not sent to the server) and suppresses its product view event. `SEOHead.forceNoIndex` prevents an SEO Pages override from indexing the client preview state; normal pages do not set it. The global page-view tag may still count a preview frame load. SEO owner should review the rendering change before release, especially products whose description, FAQ, or review panels are intentionally hidden.
+
+Comparison-table copy is now product-owned Admin data. The old Caliper-name fallback has been removed. Comparison is opt-in on every product. Without saved comparison rows, an enabled table derives up to six factual points from the product's existing specifications and marks alternatives as "Varies"; a product with no specifications uses its product name as a fallback row. Review custom copy before enabling the table because each "Others" mark is a product claim.
+
+Page Display curation can change which homepage image and product link appears in the collection/bestseller/photo sections and which PDP review photos appear. It uses existing product, hero and review requests, and does not edit SEO metadata, canonical generation, ProductGroup schema, analytics utilities or prerender scripts. The SEO owner should review configured content and link order before release, especially any intentionally empty custom placement.

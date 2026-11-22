@@ -1,31 +1,29 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { categoryPath, CATEGORY_LABEL } from '../../utils/categoryUrl';
 import { useGetProductsQuery, useGetCategoriesQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
-import UnProductCard, { firstVariant } from '../../component/UnProductCard';
+import UnProductCard from '../../component/UnProductCard';
+import { firstVariant } from '../../utils/productCardData';
 import { toItems } from '../../utils/shopItems';
 import { shopPills } from '../../utils/shopPills';
 import { trackViewItemList } from '../../utils/analytics';
 import RevealCard from '../../component/RevealCard';
 import ScrollRow from '../../component/ScrollRow';
 import SaleBanner from '../../component/festive/SaleBanner';
-import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
-import { buildOfferLines } from '../../utils/productOfferLines';
 import { ShopFilterSidebar, ShopFilterButton, ShopSort, ActiveFilterChips } from '../../component/ShopFilters';
 import { useSessionState } from '../../hooks/useSessionState';
-import { EMPTY_FILTERS, applyShopFilters, sortShopItems, demandChips, recentSalesChips } from '../../utils/shopFilters';
+import { EMPTY_FILTERS, applyShopFilters, sortShopItems } from '../../utils/shopFilters';
 
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 
 const AllProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeCat, setActiveCat] = useState(searchParams.get('category') || 'All');
+  const activeCat = searchParams.get('category') || 'All';
 
   const { data: productsResponse, isLoading, error } = useGetProductsQuery({ page: 1, limit: 24 });
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
-  useEffect(() => { setActiveCat(searchParams.get('category') || 'All'); }, [searchParams]);
   // ?tag=best_seller (footer "Bestsellers") - narrows to products carrying
   // that tag, the same tag that puts the "Bestseller" badge on a card.
   const activeTag = searchParams.get('tag');
@@ -49,61 +47,50 @@ const AllProductsPage = () => {
   // Availability / price filters: client state only, never URL params (see ShopFilters).
   const [filters, setFilters] = useSessionState('shop:all:filters', EMPTY_FILTERS);
   const [sort, setSort] = useSessionState('shop:all:sort', 'featured');
-  // Live combo benefit per product, for the card's offer line (cached query).
-  const { data: comboRes } = useGetHomeComboOffersQuery();
-  const offerLines = useMemo(() => buildOfferLines(comboRes?.data?.combos || [], new Map(products.map((x) => [String(x.productId), x.productName]))), [comboRes, products]);
-  const chips = useMemo(() => demandChips(chipProducts), [chipProducts]);
   const displayProducts = useMemo(() => sortShopItems(applyShopFilters(chipProducts, filters), sort), [chipProducts, filters, sort]);
-  const recentSales = useMemo(() => recentSalesChips(displayProducts), [displayProducts]);
 
   useEffect(() => {
     if (displayProducts.length) trackViewItemList?.({ listName: 'All Products', listId: 'all_products', items: displayProducts.map(({ p }, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
   }, [displayProducts]);
 
   const selectCat = (c) => {
-    setActiveCat(c);
     // Picking a chip leaves the bestseller view - chips are the way back out of it.
     searchParams.delete('tag');
     if (c === 'All') { searchParams.delete('category'); setSearchParams(searchParams, { replace: true }); }
     else setSearchParams({ category: c }, { replace: true });
   };
 
-  const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
+  const chip = (c) => `shop-category-pill gl-press flex min-h-10 shrink-0 items-center justify-center px-3 py-2 text-center text-[13px] font-medium leading-tight whitespace-nowrap transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
 
   return (
-    <div className="font-inter bg-surface text-ink min-h-screen">
+    <div className="shop-listing-page font-inter bg-paper text-ink min-h-screen">
       <SEOHead title="Shop All Products" url={activeCat === 'All' ? '/products' : categoryPath(activeCat)} description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
-      <div className="max-w-[1280px] mx-auto px-5 pt-10">
+      <div className="max-w-[1280px] mx-auto px-5 pt-5 md:pt-8">
         {/* same header shape as category pages (breadcrumb → title → line → pills),
             so switching between them doesn't jump the layout */}
-        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
+        <nav aria-label="Breadcrumb" className="text-[12px] md:text-[13px] text-faint mb-3">
           <Link to="/" className="hover:text-brand">Home</Link> / <span className="text-ink">Shop</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
-        <SaleBanner className="mb-5" />
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
-        <p className="text-muted mt-2 truncate">Katanas, lamps &amp; décor. Made in India.</p>
-
-        {/* One line, scrolled sideways - wrapping pushed the grid down a whole
-            row on phones, and a category list is read across, not down.
-            gl-hscroll hides the scrollbar; the negative margin lets the row
-            bleed to the screen edge so the last chip is visibly cut off,
-            which is what tells you there is more to swipe. */}
-        <ScrollRow className="mt-6" activeKey={activeCat}>
+        <SaleBanner className="mb-4" />
+        <h1 className="font-inter text-[32px] md:text-[44px] font-semibold leading-tight tracking-tight">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
+        <nav aria-label="Shop categories">
+          <ScrollRow className="mt-4" activeKey={activeCat} hideControls>
             <button onClick={() => selectCat('All')} aria-current={activeCat === 'All' ? 'page' : undefined} className={chip('All')}>All</button>
             {/* Each pill opens that category's own page (real, indexable URL). */}
             {pills.map((c) => (
               <Link key={c.slug} to={`/category/${c.slug}`} className={chip(c.slug)}>{c.label}</Link>
             ))}
-        </ScrollRow>
+          </ScrollRow>
+        </nav>
       </div>
 
-      <section className="max-w-[1280px] mx-auto px-5 py-8 pb-28 flex gap-8 [overflow-anchor:none]">
+      <section className="max-w-[1280px] mx-auto px-5 pt-5 pb-28 flex gap-8 [overflow-anchor:none]">
         {!isLoading && !error && products.length > 0 && <ShopFilterSidebar items={chipProducts} filters={filters} setFilters={setFilters} />}
         <div className="flex-1 min-w-0">
         {!isLoading && !error && products.length > 0 && (
-          <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
+          <div className="mb-3 flex items-center justify-between gap-2 sm:gap-3">
             <ShopFilterButton items={chipProducts} filters={filters} setFilters={setFilters} resultCount={displayProducts.length} />
             <p className="ml-auto whitespace-nowrap text-xs text-muted sm:text-sm">{displayProducts.length} of {chipProducts.length} items</p>
             <ShopSort value={sort} onChange={setSort} />
@@ -111,7 +98,7 @@ const AllProductsPage = () => {
         )}
         <ActiveFilterChips filters={filters} setFilters={setFilters} />
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-4">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
         ) : error ? (
           <div className="text-center py-28 border border-hair rounded-2xl bg-white">
             <h2 className="text-2xl font-extrabold">Unable to load products</h2>
@@ -133,10 +120,10 @@ const AllProductsPage = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-            {displayProducts.map(({ key, p, href, badge }, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-4">
+            {displayProducts.map(({ key, p, href }, i) => (
               <RevealCard key={key} index={i}>
-              <UnProductCard p={p} href={href} badge={badge} demand={sort === 'trending' ? 'trending' : chips.get(key)} trendCount={Number(p.variantDetails?.[0]?.soldRecent || 0)} recentSalesUnits={recentSales.get(key)} offerLine={offerLines.get(String(p.productId))} index={i} listId="all_products" listName="All Products" />
+              <UnProductCard p={p} href={href} index={i} listId="all_products" listName="All Products" />
               </RevealCard>
             ))}
           </div>

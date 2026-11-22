@@ -319,7 +319,7 @@ const BlogPostPage = () => {
           <h2 className="jp-h2 text-center mb-10">Shop the pieces in this story</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p, i) => (
-              <UnProductCard key={p.productId} p={p} href={`/product/${p.productId}`} index={i} listId={`blog_${post.slug}`} listName={`Blog: ${post.title}`} showWishlist={false} />
+              <UnProductCard key={p.productId} p={p} href={`/product/${p.productId}`} index={i} listId={`blog_${post.slug}`} listName={`Blog: ${post.title}`} />
             ))}
           </div>
         </section>

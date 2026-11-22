@@ -68,7 +68,8 @@ const POPUP_STYLES = `
 const FreeShippingPopup = memo(() => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { data } = useGetFreeShippingOfferQuery();
+  // The popup is not shown on the home page: no request there.
+  const { data } = useGetFreeShippingOfferQuery(undefined, { skip: location.pathname === '/' });
   const config = data?.data;
   const threshold = Number(config?.thresholdAmount) || 0;
 

@@ -17,8 +17,7 @@ const topDeals = (products = []) => products
     return { id: p.productId, name: p.productName, img: v.variantImage[0], off: Math.round(((v.variantMrp - v.variantPrice) / v.variantMrp) * 100) };
   })
   .filter(Boolean)
-  .sort((a, b) => b.off - a.off)
-  .slice(0, 3);
+  .sort((a, b) => b.off - a.off);
 
 /**
  * Full-width festive offer band for the home page, right under the hero, so
@@ -27,13 +26,16 @@ const topDeals = (products = []) => products
  * live on this page (admin's section-accents switch) and disappears by itself
  * when it ends; the countdown follows admin's end date.
  */
-const FestiveOfferBand = ({ products = [] }) => {
+const FestiveOfferBand = ({ products = [], selection }) => {
   const { active, can, themeKey } = useSiteCampaign();
   const headline = HEADLINES[themeKey];
   if (!active || !can('sectionAccents') || !headline) return null;
   const copy = THEME_COPY[themeKey] || {};
   const upTo = maxDiscountPercent(products);
-  const deals = topDeals(products);
+  const available = topDeals(products);
+  const deals = Array.isArray(selection)
+    ? selection.map(({ id, image }) => ({ ...available.find((deal) => deal.id === id), img: image })).filter((deal) => deal.id).slice(0, 3)
+    : available.slice(0, 3);
 
   return (
     // Header of the home offers section (ComboOfferSection `lead`): the sale,
