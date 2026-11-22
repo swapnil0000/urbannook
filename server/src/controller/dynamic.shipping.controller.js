@@ -1,8 +1,7 @@
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ApiRes } from "../utils/index.js";
-import {
-  calculateShippingRate
-} from "../services/shipping.service.js";
+import { getShippingRateOrFallback } from "../services/shippingRateFallback.service.js";
+import { COD_FEE } from "../utils/orderAmount.util.js";
 
 const dynamicShippingCal = asyncHandler(async (req, res) => {
   // console.log("\n" + "*".repeat(80));
@@ -37,7 +36,9 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
 
   // console.log("[CONTROLLER] ✓ Validation passed, calling calculateShippingRate service...\n");
 
-  const selectedService = await calculateShippingRate({ 
+  // Same fallback as order create: the courier API being down quotes the static
+  // rate instead of a 500; only an unserviceable pincode stops checkout (400).
+  const selectedService = await getShippingRateOrFallback({
     pincode, 
     cartItems,
     // display value from the checkout page (after offers); the order itself re-derives it server-side
@@ -49,8 +50,12 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
   // console.log("[CONTROLLER] Sending response to client");
   // console.log("*".repeat(80) + "\n");
 
+  // The COD fee rides on the COD quote, so the checkout shows what the order
+  // will actually charge without keeping its own copy of the number.
+  const codFee = paymentType === "COD" ? COD_FEE : 0;
+
   return res.status(200).json(
-    new ApiRes(200, "Shipping rate calculated successfully", selectedService, true)
+    new ApiRes(200, "Shipping rate calculated successfully", { ...selectedService, codFee }, true)
   );
 });
 

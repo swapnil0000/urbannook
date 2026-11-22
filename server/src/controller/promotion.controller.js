@@ -649,9 +649,9 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const appliedPromotionIds = appliedPromotionIdsFromResult(matchedResult);
 
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "checkout", appliedPromotionIds });
-  // freeShipping: a matched free_shipping promotion (e.g. one linked to a coupon code).
-  // Order creation already charges 0 shipping for it; this lets the checkout screen show it.
-  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, freeShipping: Boolean(matchedResult.freeShipping) }, true));
+  // A matched free_shipping promotion, including coupon-linked ones, waives
+  // delivery and the COD fee in the checkout preview and final order.
+  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, freeShipping: !!matchedResult.freeShipping }, true));
 });
 
 // Which exact productIds a conditionTree names via "product" leaves -

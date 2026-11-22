@@ -4,6 +4,7 @@ import { useGetOrderViewQuery, useGetOrderRecommendationsQuery, useGetInvoiceLin
 import { useUI } from "../../hooks/useRedux";
 import { resolveVariantTitle } from "../../utils/variantTitle";
 import WishlistButton from "../WishlistButton";
+import { track } from "../../utils/analytics";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Customer order pages, in one file: confirmation hero, tracking, payment,
@@ -295,7 +296,26 @@ export const Tracking = ({ view }) => {
 };
 
 // ── payment ──────────────────────────────────────────────────────────────────
-export const Payment = ({ payment }) => {
+// COD balance on offer online with the COD fee waived (server: services/codPrepaidLink.service.js).
+export const PayOnlineOffer = ({ offer }) => {
+  const until = new Date(offer.expiresAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  return (
+    <a
+      href={offer.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => track("cod_pay_online_click", { amount: offer.amount, fee_waived: offer.feeWaived })}
+      className="mb-3 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center hover:bg-emerald-100"
+    >
+      <p className="text-[15px] font-bold text-emerald-800">
+        Pay {formatINR(offer.amount)} online now{offer.feeWaived > 0 ? ` and skip the ${formatINR(offer.feeWaived)} COD fee` : ""} →
+      </p>
+      <p className="mt-1 text-[12px] text-emerald-700">Open till {until}. Your order then ships prepaid - nothing to pay at the door.</p>
+    </a>
+  );
+};
+
+export const Payment = ({ payment, offer }) => {
   const tone = PAYMENT_TONE[payment.state] || "info";
   const cod = payment.method !== "PREPAID";
   const owes = payment.amountDue > 0 && !["CANCELLED", "FAILED"].includes(payment.state);
@@ -307,6 +327,7 @@ export const Payment = ({ payment }) => {
       <div className={`uo-banner uo-hm ${BANNER[tone]} mb-3`}>
         {tone === "success" && <span className="uo-tick"><i className="fa-solid fa-check" /></span>}{status}
       </div>
+      {offer && <PayOnlineOffer offer={offer} />}
       {owes && cod && payment.state !== "PENDING" && (
         <div className="uo-panel mb-3" style={{ display: "block", textAlign: "center" }}>
           <p className="uo-sub">Pay on delivery</p>
@@ -526,7 +547,7 @@ export const OrderPageBody = ({ view, mode = "details" }) => (
         <div className="order-5 lg:order-none grid gap-3 md:grid-cols-[1.25fr_1fr] lg:gap-4"><Address d={view.delivery} /><Contact d={view.delivery} /></div>
       </div>
       <div className="contents lg:flex lg:flex-col lg:gap-4 lg:min-w-0">
-        <div className="order-2 lg:order-none"><Payment payment={view.payment} /></div>
+        <div className="order-2 lg:order-none"><Payment payment={view.payment} offer={view.payOnlineOffer} /></div>
         <div className="order-4 lg:order-none"><Price pricing={view.pricing} payment={view.payment} /></div>
         <div className="order-6 lg:order-none"><Actions view={view} /></div>
       </div>

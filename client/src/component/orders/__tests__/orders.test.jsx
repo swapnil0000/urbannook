@@ -9,6 +9,8 @@ vi.mock("../../../store/api/userApi", () => ({
 }));
 vi.mock("../../../hooks/useRedux", () => ({ useUI: () => ({ showNotification: vi.fn() }) }));
 vi.mock("../../WishlistButton", () => ({ default: () => null }));
+const tracked = [];
+vi.mock("../../../utils/analytics", () => ({ track: (name, params) => tracked.push({ name, params }) }));
 
 import { OrderPageBody, OrderSummaryCard, Tracking, Payment, Price, Items, Actions } from "../OrderPage";
 
@@ -157,6 +159,21 @@ describe("tracking", () => {
 });
 
 describe("payment status", () => {
+  it("COD with the balance on offer online: the pay-online link, the fee it saves and until when", () => {
+    const offer = { url: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: "2026-10-31T13:00:00.000Z" };
+    wrap(<Payment payment={payment({ state: "ADVANCE_PAID", label: "Advance Paid", method: "PARTIAL_COD", orderTotal: 1798, amountPaid: 298, amountDue: 1500, balanceOnDelivery: 1500, advanceRequired: 298, netPaid: 298 })} offer={offer} />);
+    const link = screen.getByRole("link", { name: /Pay ₹1,451.00 online now and skip the ₹49.00 COD fee/ });
+    expect(link.getAttribute("href")).toBe("https://rzp.io/i/x");
+    fireEvent.click(link);
+    expect(tracked.at(-1)).toMatchObject({ name: "cod_pay_online_click", params: { amount: 1451, fee_waived: 49 } });
+    expect(screen.getByText("Pay on delivery")).toBeTruthy(); // the COD option is still shown
+  });
+
+  it("no offer: no pay-online link", () => {
+    wrap(<Payment payment={payment({ state: "ADVANCE_PAID", label: "Advance Paid", method: "PARTIAL_COD", orderTotal: 1798, amountPaid: 298, amountDue: 1500, balanceOnDelivery: 1500, netPaid: 298 })} />);
+    expect(screen.queryByRole("link", { name: /online now/ })).toBeNull();
+  });
+
   it("prepaid: paid in full, nothing due, method and transaction id", () => {
     wrap(<Payment payment={payment()} />);
     expect(valueOf("Amount Paid")).toBe("₹1,448.00");

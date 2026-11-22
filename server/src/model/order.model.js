@@ -224,6 +224,39 @@ const orderSchema = new mongoose.Schema(
     codDetails: {
       partialAmountPaid: { type: Number, default: 0 },
       remainingAmount: { type: Number, default: 0 },
+      // COD fee inside `amount` (and collected in remainingAmount). 0 on orders before it existed.
+      codFee: { type: Number, default: 0 },
+    },
+    // Which arm of a checkout A/B trial placed this order (utils/checkoutExperiment.js).
+    checkoutExperiment: {
+      type: new mongoose.Schema({ name: String, arm: String }, { _id: false }),
+      default: undefined,
+    },
+    // COD balance offered as a Razorpay payment link, COD fee waived
+    // (services/codPrepaidLink.service.js has the status lifecycle). Admin
+    // holds the courier push while it is pending/sent.
+    codConversion: {
+      type: new mongoose.Schema(
+        {
+          status: {
+            type: String,
+            enum: ["pending", "creating", "sent", "failed", "paid", "expired", "cancelled", "refunded", "refund_failed"],
+          },
+          requestedAt: Date,
+          linkId: String,
+          shortUrl: String,
+          amount: Number,
+          feeWaived: Number,
+          expiresAt: Date,
+          paymentId: String,
+          paidAt: Date,
+          whatsappSent: Boolean,
+          refundId: String,
+          error: String,
+        },
+        { _id: false },
+      ),
+      default: undefined,
     },
 
     isGuestOrder: { type: Boolean, default: false },

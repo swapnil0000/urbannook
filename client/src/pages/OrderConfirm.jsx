@@ -5,7 +5,7 @@ import { useUI } from "../hooks/useRedux";
 import { getApiUrl } from "../config/appUrls";
 import { setShowLoginModal, setLoginCallback, setLoginPrefillEmail } from "../store/slices/uiSlice";
 import GoogleLoginButton from "../component/layout/auth/GoogleLoginButton";
-import { OrderDetailsView } from "../component/orders/OrderPage";
+import { OrderDetailsView, PayOnlineOffer } from "../component/orders/OrderPage";
 
 // What the server's order status means for this page.
 const PAID_STATUSES = ["PAID", "CONFIRMED", "SHIPPED", "DELIVERED"];
@@ -88,6 +88,8 @@ const OrderConfirm = () => {
   const isGuestOrder = orderData?.isGuestOrder ?? false;
   const guestEmail = orderData?.guestEmail ?? null;
   const isNewGuestAccount = orderData?.isNewGuestAccount ?? true;
+  // COD balance on offer online (COD fee waived) — guests cannot open the order page, so it goes here.
+  const payOnlineOffer = orderData?.payOnlineOffer ?? null;
 
   // Signed-in customer: the full order page (payment, tracking, items, pricing). Its data comes from one
   // owner-checked read, and it only ever shows what the order's recorded state supports.
@@ -108,6 +110,7 @@ const OrderConfirm = () => {
         </div>
 
         <div className="px-8 py-6 space-y-4">
+          {payOnlineOffer && <PayOnlineOffer offer={payOnlineOffer} />}
           {isNewGuestAccount ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex gap-3">
               <i className="fa-solid fa-envelope text-amber-500 mt-0.5 shrink-0"></i>

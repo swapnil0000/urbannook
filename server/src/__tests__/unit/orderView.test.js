@@ -385,6 +385,14 @@ describe("pricing", () => {
     expect(v.pricing).toMatchObject({ itemsSubtotal: 1299, shippingCharged: 149, reconciles: true, totalSavings: null });
   });
 
+  it("COD fee is its own line, not an unexplained 'Other charges'", () => {
+    const v = view(base({ amount: 1497, paymentMethod: "COD", codDetails: { partialAmountPaid: 298, remainingAmount: 1199, codFee: 49 } }));
+    expect(v.pricing.lines.find((l) => l.key === "codFee")).toMatchObject({ label: "COD fee", amount: 49 });
+    expect(v.pricing.lines.find((l) => l.key === "adjustment")).toBeUndefined();
+    expect(sum(v)).toBe(1497);
+    expect(v.pricing).toMatchObject({ codFee: 49, reconciles: true });
+  });
+
   it("coupon is shown once, with its code, and the lines still add up", () => {
     const v = view(base({ amount: 1348, coupon: { isApplied: true, couponCodeName: "SAVE100", discountAmount: 100 } }));
     expect(v.pricing.lines.find((l) => l.key === "coupon")).toMatchObject({ amount: -100, detail: "SAVE100" });
@@ -521,5 +529,33 @@ describe("delay update from the team (order.customerNotice)", () => {
     expect(view(base({ customerNotice: notice({ sentAt: new Date("2026-09-01T00:00:00Z") }) }), [ship()]).notice).toBeNull();
     expect(view(base({ customerNotice: notice({ kind: "PROMO" }) }), [ship()]).notice).toBeNull();
     expect(view(base({ customerNotice: notice({ message: "  " }) }), [ship()]).notice).toBeNull();
+  });
+});
+
+describe("COD balance offered online (payment link, COD fee waived)", () => {
+  const codOrder = (codConversion, over = {}) => base({
+    amount: 1798, paymentMethod: "COD",
+    codDetails: { partialAmountPaid: 298, remainingAmount: 1500, codFee: 49 },
+    codConversion, ...over,
+  });
+  const open = { status: "sent", shortUrl: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: new Date("2026-10-31T13:00:00.000Z") };
+
+  it("shown while the link is open and nothing has shipped", () => {
+    expect(view(codOrder(open)).payOnlineOffer).toEqual({ url: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: "2026-10-31T13:00:00.000Z" });
+  });
+
+  it.each([
+    ["expired", { ...open, expiresAt: new Date("2026-10-31T11:00:00.000Z") }, []],
+    ["already shipped", open, [ship()]],
+    ["not offered", undefined, []],
+    ["link failed", { status: "failed" }, []],
+  ])("%s: not shown", (_l, c, shipments) => {
+    expect(view(codOrder(c), shipments).payOnlineOffer).toBeNull();
+  });
+
+  it("paid online: shown as prepaid, with the second payment as a reference", () => {
+    const v = view(codOrder({ status: "paid", paymentId: "pay_bal" }, { paymentMethod: "PREPAID", amount: 1749, codDetails: { partialAmountPaid: 298, remainingAmount: 0, codFee: 0 } }));
+    expect(v.payOnlineOffer).toBeNull();
+    expect(v.payment).toMatchObject({ method: "PREPAID", amountPaid: 1749, amountDue: 0, balanceOnDelivery: 0, balancePaymentRef: "pay_bal" });
   });
 });

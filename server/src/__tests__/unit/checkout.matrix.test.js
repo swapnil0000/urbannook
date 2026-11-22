@@ -20,7 +20,7 @@
  * items, and `magicChargeSettles` below is that invariant.
  */
 
-import { computeOrderCharge } from "../../utils/orderAmount.util.js";
+import { computeOrderCharge, COD_FEE } from "../../utils/orderAmount.util.js";
 import {
   buildMagicLineItems,
   lineItemsTotalPaise,
@@ -67,6 +67,7 @@ const charge = ({
     isInternalTestOrder,
     isMagic,
     paymentMethod,
+    freeShippingUnlocked: freeShipping,
   });
 
 /**
@@ -153,8 +154,21 @@ describe("Order charge — one formula for every checkout", () => {
       const c = charge({ paymentMethod: "COD" });
       expect(c.isCOD).toBe(true);
       expect(c.codPartialAmount).toBe(SHIPPING * 2);
-      expect(c.codRemainingAmount).toBe(SUBTOTAL + SHIPPING - SHIPPING * 2);
+      expect(c.codRemainingAmount).toBe(SUBTOTAL + SHIPPING + COD_FEE - SHIPPING * 2);
       expect(c.razorpayChargeAmountPaise).toBe(SHIPPING * 2 * 100);
+    });
+
+    test("adds the COD fee; the same order paid online does not carry it", () => {
+      const cod = charge({ paymentMethod: "COD" });
+      const prepaid = charge();
+      expect(cod.codFee).toBe(COD_FEE);
+      expect(prepaid.codFee).toBe(0);
+      expect(cod.finalAmount - prepaid.finalAmount).toBe(COD_FEE);
+    });
+
+    test("a coupon that takes the whole product total still leaves the COD fee", () => {
+      const c = charge({ paymentMethod: "COD", discount: SUBTOTAL + SHIPPING + 500 });
+      expect(c.finalAmount).toBe(COD_FEE);
     });
 
     test("free shipping does NOT zero the COD advance", () => {
@@ -165,11 +179,18 @@ describe("Order charge — one formula for every checkout", () => {
       expect(c.finalAmount).toBe(SUBTOTAL);
     });
 
+    test("free shipping from admin waives the COD fee too", () => {
+      // Threshold or a free_shipping promotion: COD delivery is free, fee included.
+      const c = charge({ paymentMethod: "COD", freeShipping: true });
+      expect(c.codFee).toBe(0);
+      expect(c.codRemainingAmount).toBe(SUBTOTAL - SHIPPING * 2);
+    });
+
     test("advance is capped at the order value on a tiny order", () => {
       const c = charge({ subtotal: 200, paymentMethod: "COD", discount: 180 });
-      // order = 200 + 179 - 180 = 199, and 2x179 = 358 would exceed it
-      expect(c.finalAmount).toBe(199);
-      expect(c.codPartialAmount).toBe(199);
+      // order = 200 + 179 - 180 + fee, and 2x179 = 358 would exceed it
+      expect(c.finalAmount).toBe(199 + COD_FEE);
+      expect(c.codPartialAmount).toBe(199 + COD_FEE);
       expect(c.codRemainingAmount).toBe(0);
     });
 
@@ -178,6 +199,7 @@ describe("Order charge — one formula for every checkout", () => {
       expect(c.finalAmount).toBe(1);
       expect(c.codPartialAmount).toBe(1);
       expect(c.codRemainingAmount).toBe(0);
+      expect(c.codFee).toBe(0);
     });
   });
 
@@ -186,6 +208,7 @@ describe("Order charge — one formula for every checkout", () => {
       const c = charge({ isMagic: true, paymentMethod: "COD" });
       expect(c.isCOD).toBe(false);
       expect(c.codPartialAmount).toBe(0);
+      expect(c.codFee).toBe(0);
     });
 
     test("shipping stays out of the amount — Razorpay adds it from the callback", () => {

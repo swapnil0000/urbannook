@@ -36,6 +36,7 @@ import GiftClaimList from "../component/promotions/GiftClaimList";
 import { CartGiftProgress } from "../component/offers/CartValueGift";
 import { useRetireGiftWrap } from "../hooks/useRetireGiftWrap";
 import ShipsWithinNote from "../component/ShipsWithinNote";
+import CheckoutHelpLine from "../component/support/CheckoutHelpLine";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery, useGetAvailableCouponsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -48,14 +49,6 @@ const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 const PaymentCancelFeedbackModal = lazy(() => import("../component/PaymentCancelFeedbackModal"));
-
-// What the courier charges to collect/remit cash at the door - the reason a
-// COD order costs more than the same order paid online. Display-only: the real
-// difference is already baked into the carrier rate returned for paymentType
-// "COD" (see the shipping-rate call below), this range just lets the notice
-// name the figure. A range (not one number) because the courier's exact COD
-// fee varies per order - keep it in step with what they actually charge.
-const COD_HANDLING_FEE = "30-40";
 
 // Guests used to pick "guest or sign in" on a step of its own. That screen
 // only ever cost a tap - the same choice now sits on the Contact step, where
@@ -126,7 +119,17 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, onApplyCoupon, onRemoveCoupon, paymentMethod }) => {
+// Shown beside every "pay online" choice. "Easy refunds", not "instant": a
+// Razorpay refund takes days to reach a card, and the line must stay true.
+const PaymentTrustLine = ({ className = "" }) => (
+  <p className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-gray-500 ${className}`}>
+    <span className="flex items-center gap-1"><i className="fa-solid fa-lock text-[9px]" /> 100% secure payments</span>
+    <span className="flex items-center gap-1"><i className="fa-solid fa-rotate-left text-[9px]" /> Easy refunds</span>
+    <span className="flex items-center gap-1"><i className="fa-solid fa-shield-halved text-[9px]" /> Secured by Razorpay</span>
+  </p>
+);
+
+const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, codFee = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, onApplyCoupon, onRemoveCoupon, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount - same real/charged split as the
@@ -137,9 +140,9 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
-  // giftWrapAmount is added to both sides - it's a real add-on charge, not a
-  // discount opportunity, so opting into it must never change this number.
-  const totalSavings = Math.max(0, subtotal + promotionSavings + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
+  // giftWrapAmount and codFee are added to both sides - real add-on charges, not
+  // discount opportunities, so choosing them must never change this number.
+  const totalSavings = Math.max(0, subtotal + promotionSavings + giftWrapAmount + codFee + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -197,6 +200,13 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
           )}
         </span>
       </div>
+
+      {codFee > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">COD fee</span>
+          <span className="font-bold text-gray-900">₹{codFee.toLocaleString()}</span>
+        </div>
+      )}
 
       {/* Coupon row - Flipkart-style, sits just above Total */}
       {(onApplyCoupon || hasDiscount) && (
@@ -365,13 +375,17 @@ const CheckoutPage = () => {
   // PREPAID and let shipping re-calc settle BEFORE charging - otherwise the
   // amount could be stale (customer pays less → our loss). This queues the pay
   // and an effect fires it only once the amount is settled.
-  const [pendingPay, setPendingPay] = useState(null); // null | "ONLINE"
-  // Real ₹ a customer saves by paying online instead of COD = (COD carrier rate
-  // − prepaid carrier rate). 0 when free shipping zeroes both. Drives the
-  // "SAVE ₹X" nudge on the Pay Online button.
+  const [pendingPay, setPendingPay] = useState(null); // null | "ONLINE" | "EXPRESS" (Magic, from the COD fee card)
+  // Real ₹ a customer saves by paying online instead of COD = COD fee + (COD
+  // carrier rate − prepaid carrier rate). Drives the "SAVE ₹X" nudge on the
+  // Pay Online button and in the COD sheet.
   const [codSaving, setCodSaving] = useState(0);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
+  // Why the last payment attempt stopped (payment_cancelled | payment_failed | payment_error |
+  // verify_failed) and its Razorpay order id - shown with the error as a call / WhatsApp help
+  // line (component/support/CheckoutHelpLine.jsx), so only shoppers who tried to pay see it.
+  const [payHelp, setPayHelp] = useState(null);
   // { razorpayOrderId, value } while the "what stopped you?" form is open after a Razorpay cancel.
   const [cancelFeedback, setCancelFeedback] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -427,11 +441,21 @@ const CheckoutPage = () => {
     { skip: cartItems.length === 0 },
   );
   const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
-  const promoFreeShipping = Boolean(checkoutPromotionsData?.data?.freeShipping);
   // Same server-evaluated item discount preview shown in the cart. It is
   // subtracted from the raw/coupon subtotal for display only; order creation
   // independently applies the promotion when calculating the real charge.
   const ruleDiscountSavings = Number(checkoutPromotionsData?.data?.pricing?.savings) || 0;
+  // A free_shipping promotion matched (admin can set one per product) - delivery
+  // and the COD fee are free, exactly as the order will charge.
+  const promoFreeShipping = !!checkoutPromotionsData?.data?.freeShipping;
+  // Free shipping, same two signals as the server's freeShippingUnlocked: the
+  // admin's cart-value threshold, or a free_shipping promotion. Either one
+  // waives the COD fee too.
+  const freeShippingOffer = freeShippingOfferData?.data;
+  const freeShippingNow = promoFreeShipping || (
+    !!freeShippingOffer?.isActive && (freeShippingOffer?.thresholdAmount || 0) > 0 &&
+    cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings >= freeShippingOffer.thresholdAmount
+  );
   const checkoutPriceLine = (item) => checkoutPromotionsData?.data?.pricing?.lines?.find((line) =>
     line.productId === String(item.productId || item.mongoId || item.id) &&
     (line.selectedVariant || 'N/A') === (item.selectedVariant || 'N/A'));
@@ -667,15 +691,7 @@ const CheckoutPage = () => {
         const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
-          // Free shipping is a single admin-configured field - cart subtotal
-          // vs a ₹ threshold, nothing product-specific - so a plain
-          // comparison is the correct (and only) eligibility check.
-          const offerConfig = freeShippingOfferData?.data;
-          const cartSubtotal =
-            cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
-          // ...or a free_shipping promotion that matched (coupon-linked ones need the coupon applied)
-          const isFreeShippingEligible = promoFreeShipping ||
-            (!!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount);
+          const isFreeShippingEligible = freeShippingNow;
           // realAmount = actual carrier rate, always - this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects - 0 when free
@@ -683,20 +699,22 @@ const CheckoutPage = () => {
           // from silently inheriting the free-shipping zero.
           const realAmount = parseFloat(result.data.total_charges);
           const shippingAmount = isFreeShippingEligible ? 0 : realAmount;
+          // Free shipping waives the COD fee too (server: computeOrderCharge).
+          const codFeeQuoted = isFreeShippingEligible ? 0 : Number(codRes?.data?.codFee) || 0;
           setPricingDetails(prev => ({
             ...prev,
-            shipping: { ...result.data, amount: shippingAmount, realAmount }
+            shipping: { ...result.data, amount: shippingAmount, realAmount, codFee: paymentMethod === "COD" ? codFeeQuoted : 0 }
           }));
           setShippingError("");
 
-          // Honest online-vs-COD saving = the extra delivery COD charges.
-          // Free shipping zeroes shipping for both methods → ₹0 (badge hides).
+          // Honest online-vs-COD saving = the COD fee + any extra delivery COD
+          // charges. Free shipping zeroes both, so the badge hides.
           const prepaidReal = parseFloat(prepaidRes?.data?.total_charges);
           const codReal = parseFloat(codRes?.data?.total_charges);
-          const saving = isFreeShippingEligible || !prepaidReal || !codReal
+          const deliveryGap = isFreeShippingEligible || !prepaidReal || !codReal
             ? 0
             : Math.max(0, Math.ceil(codReal) - Math.ceil(prepaidReal));
-          setCodSaving(saving);
+          setCodSaving(codFeeQuoted + deliveryGap);
 
           trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
         } else {
@@ -715,7 +733,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings, promoFreeShipping]);
+  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings, freeShippingNow]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -894,6 +912,7 @@ const CheckoutPage = () => {
     } catch { /* fall through to the cancelled message */ }
     trackPaymentModalDismissed({ orderId: rpOrderId, value });
     setPaymentError("Payment cancelled. Your cart is safe.");
+    setPayHelp({ reason: "payment_cancelled", orderId: rpOrderId });
     setShowRetry(true);
     setCancelFeedback({ razorpayOrderId: rpOrderId, value });
   };
@@ -1262,13 +1281,14 @@ const CheckoutPage = () => {
         rp.on("payment.failed", (r) => {
           trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
           setPaymentError(r.error.description || "Payment failed. Please try again.");
+          setPayHelp({ reason: "payment_failed", orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
           setShowRetry(true);
         });
         rp.open();
       } catch (e) {
         if (handleGiftClaimError(e)) return;
         const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
-        showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
+        showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true); setPayHelp({ reason: "payment_error" });
         // Express skipped our forms on the promise that Magic would collect
         // everything. If the server declined it, the order has no address and
         // this rejection is the only signal we get - put the steps back rather
@@ -1346,7 +1366,10 @@ const CheckoutPage = () => {
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
-          } catch { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
+          } catch {
+            setPaymentError("Payment verification failed. Contact support if amount was debited.");
+            setPayHelp({ reason: "verify_failed", orderId: response.razorpay_order_id });
+          }
         },
         prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
@@ -1356,13 +1379,14 @@ const CheckoutPage = () => {
       rp.on("payment.failed", (r) => {
         trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
         setPaymentError(r.error.description || "Payment failed. Please try again.");
+        setPayHelp({ reason: "payment_failed", orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
         setShowRetry(true);
       });
       rp.open();
     } catch (e) {
       if (handleGiftClaimError(e)) return;
       const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
-      showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
+      showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true); setPayHelp({ reason: "payment_error" });
       // Express skipped the forms expecting Magic to collect everything. If the
       // server declined it, the order has no address and this is the only
       // signal we get - put the steps back.
@@ -1403,16 +1427,33 @@ const CheckoutPage = () => {
     return true;
   };
 
-  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
+  // The COD fee comes on the COD shipping quote (server: COD_FEE in orderAmount.util.js),
+  // already 0 when free shipping applies,
+  // so this total is what the order will charge - same formula as computeOrderCharge.
+  // Before that quote exists (Contact / Address steps - it is only fetched on
+  // Review) the fee comes from /free-shipping-offer (`codFee`, same server
+  // constant), waived when free shipping already applies. The quote wins once
+  // it arrives.
+  const quotedCodFee = pricingDetails.shipping ? pricingDetails.shipping.codFee : undefined;
+  const codFee = paymentMethod !== "COD"
+    ? 0
+    : quotedCodFee !== undefined
+      ? Number(quotedCodFee) || 0
+      : freeShippingNow ? 0 : Number(freeShippingOffer?.codFee) || 0;
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount + codFee;
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
-  const COD_HANDLING_FEE = 35; // portion of the advance that is the non-refundable COD fee (label only, no math change)
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const codAdvance = realShippingAmount > 0 ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
   const codRemaining = Math.max(0, totalToPay - codAdvance);
   // Amount is safe to charge only once shipping has actually settled.
   const amountsSettled = !isCalculatingShipping && pricingDetails.shipping !== null && !shippingError;
   const payBusy = isOrdering || !!pendingPay;
+  // COD fee nudge (desktop card above the form, mobile strip in the sticky bar).
+  // On Review it waits for the COD quote so the figure is what the order charges.
+  const showCodFeeNudge = paymentMethod === "COD" && codFee > 0 && (currentStep !== reviewStep || amountsSettled);
+  const codSaveAmount = currentStep === reviewStep ? Math.max(codSaving, codFee) : codFee;
+  const codSaveLabel = `${currentStep !== reviewStep && !config.features.enableMagicCheckout ? "Switch to online" : "Pay online"} & save ₹${codSaveAmount.toLocaleString()}`;
 
   // Fire the queued online payment only after the toggle to PREPAID has
   // settled the amount - guarantees full amount, never a stale/lower one.
@@ -1457,8 +1498,49 @@ const CheckoutPage = () => {
     handlePayment();
   };
 
+  // "Pay online & save ₹X" from the COD path (Review-step card and COD sheet).
+  // Leaves the COD-only review (payChoice "COD" hides the Pay Online buttons),
+  // so if the Razorpay modal is then dismissed the customer sees both options
+  // again instead of only the COD button. Still one tap: handlePayOnline flips
+  // to PREPAID and charges only once the prepaid amount has settled.
+  //
+  // Before Review there is no address and no prepaid quote yet:
+  //   - Magic half of the trial: open Razorpay Magic, which collects the
+  //     address itself (same as tapping Prepaid on the first screen). Queued
+  //     via pendingPay "EXPRESS" because handlePayment reads paymentMethod from
+  //     state, which is still COD in this render.
+  //   - standard half: just switch to prepaid; they pay on Review as usual.
+  const handleSwitchToPrepaid = () => {
+    if (payBusy) return;
+    setShowCodSheet(false);
+    if (currentStep !== reviewStep) {
+      setPaymentMethod("PREPAID");
+      trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
+      if (expressAvailable) {
+        setPayChoice("EXPRESS");
+        setPendingPay("EXPRESS");
+      } else if (payChoice === "COD") {
+        setPayChoice("FORM");
+      }
+      return;
+    }
+    if (payChoice === "COD") setPayChoice("FORM");
+    handlePayOnline();
+  };
+
+  // Releases the queued Magic payment once the switch to PREPAID has rendered.
+  useEffect(() => {
+    if (pendingPay !== "EXPRESS") return;
+    if (paymentMethod === "PREPAID" && !isOrdering) {
+      setPendingPay(null);
+      handlePayment({ forceMagic: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPay, paymentMethod, isOrdering]);
+
   // ── Express (guest + Magic): no forms at all ───────────────────────────────
-  // Offered only when the build flag is on. The SERVER has the final say and
+  // Offered whenever the build flag is on (the Magic-vs-standard trial that
+  // hid it from half the shoppers ended 2026-11-17). The SERVER has the final say and
   // may still decline Magic (its own flag, or a guests-only rollout), in which
   // case the order it builds needs an address we never collected - that lands
   // in the guest error path above, which puts the steps back.
@@ -1629,15 +1711,19 @@ const CheckoutPage = () => {
           {paymentError && (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
               <i className="fa-solid fa-circle-exclamation text-red-500 text-xs mt-0.5" />
-              <p className="text-xs text-red-600 leading-relaxed">{paymentError}</p>
+              <div className="min-w-0">
+                <p className="text-xs text-red-600 leading-relaxed">{paymentError}</p>
+                {payHelp && <CheckoutHelpLine reason={payHelp.reason} orderId={payHelp.orderId} value={totalToPay} className="mt-3" />}
+              </div>
             </div>
           )}
 
           {/* ── The choice ─────────────────────────────────────────────────
               Two rows in one card, not two pitches. The only thing that
               actually differs for the customer is WHEN the money leaves, so
-              that is the only thing each row says. Nothing here advertises the
-              checkout to someone who has already decided to buy. */}
+              that is the only thing each row says. The COD fee is not quoted
+              here: it is shown on the COD path itself (Review step card and the
+              COD sheet), next to a "pay online and save" way back. */}
           <div className="mt-6 space-y-3">
             <button
               onClick={handleExpressPay}
@@ -1812,6 +1898,40 @@ const CheckoutPage = () => {
       {currentStep === reviewStep && cartTotalAmount >= (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && checkoutPromotions.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
+        </div>
+      )}
+      {/* COD fee + the way back to prepaid, on every step of the COD path.
+          Contact / Address: the fee comes from /free-shipping-offer (no quote
+          yet). Review: only once the COD quote has settled, so it is exactly
+          what the order will charge. Hidden when the fee is waived (free
+          shipping → codFee 0). The pay-choice screen deliberately does not
+          mention the fee. */}
+      {showCodFeeNudge && (
+        <div className="hidden lg:block max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <i className="fa-solid fa-hand-holding-dollar text-amber-600 text-sm mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900">₹{codFee.toLocaleString()} extra for Cash on Delivery</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {currentStep === reviewStep && codSaving > codFee
+                    ? `COD fee plus a higher COD delivery charge. Pay online and save ₹${codSaving.toLocaleString()}.`
+                    : "This COD fee is added to your total. Pay online and skip it."}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleSwitchToPrepaid}
+              disabled={payBusy}
+              className="shrink-0 h-10 px-4 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {payBusy ? (
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <><i className="fa-solid fa-bolt text-[11px]" /> {codSaveLabel}</>
+              )}
+            </button>
+          </div>
         </div>
       )}
       {/* dispatch promise - every step, so it's seen before paying */}
@@ -2419,6 +2539,7 @@ const CheckoutPage = () => {
                       shipping={pricingDetails.shipping}
                       discount={pricingDetails.discount}
                       giftWrapAmount={giftWrapAmount}
+                      codFee={codFee}
                       appliedCoupon={appliedCoupon}
                       totalToPay={totalToPay}
                       itemCount={cartItems.length}
@@ -2537,6 +2658,9 @@ const CheckoutPage = () => {
                         Dismiss &amp; Retry
                       </button>
                     )}
+                    {payHelp && (
+                      <CheckoutHelpLine reason={payHelp.reason} orderId={payHelp.orderId} value={totalToPay} className="mt-4 pt-3 border-t border-red-100" />
+                    )}
                   </div>
                 </div>
               )}
@@ -2644,6 +2768,7 @@ const CheckoutPage = () => {
                 shipping={pricingDetails.shipping}
                 discount={pricingDetails.discount}
                 giftWrapAmount={giftWrapAmount}
+                codFee={codFee}
                 appliedCoupon={appliedCoupon}
                 totalToPay={totalToPay}
                 itemCount={cartItems.length}
@@ -2716,6 +2841,7 @@ const CheckoutPage = () => {
                   <i className="fa-brands fa-google-pay text-gray-300 text-lg" />
                   <i className="fa-solid fa-building-columns text-gray-300 text-base" />
                 </div>
+                <PaymentTrustLine />
               </div>
             )}
           </div>
@@ -2739,11 +2865,32 @@ const CheckoutPage = () => {
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
-                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
+                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} giftWrapAmount={giftWrapAmount} codFee={codFee} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
               </div>
             </div>
           )}
           <div className="bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 pb-5 shadow-[0_-12px_40px_rgba(0,0,0,0.1)]">
+            {/* COD fee + one tap back to prepaid, right by the Continue / Pay
+                button (the desktop card above the form is hidden here - the
+                mobile form sheet covers that area). */}
+            {showCodFeeNudge && (
+              <div className="max-w-sm mx-auto mb-2.5 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                <span className="text-[11px] text-gray-700 min-w-0">
+                  <span className="font-bold text-gray-900">₹{codFee.toLocaleString()}</span> COD fee added
+                </span>
+                <button
+                  onClick={handleSwitchToPrepaid}
+                  disabled={payBusy}
+                  className="shrink-0 text-[11px] font-bold text-emerald-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {payBusy ? (
+                    <div className="w-3 h-3 border-2 border-emerald-200 border-t-emerald-700 rounded-full animate-spin" />
+                  ) : (
+                    <><i className="fa-solid fa-bolt text-[9px]" /> {codSaveLabel} →</>
+                  )}
+                </button>
+              </div>
+            )}
             <div className="max-w-sm mx-auto flex items-center gap-3">
               <button onClick={() => setMobileSummaryOpen((o) => !o)} className="text-left shrink-0" aria-label="Toggle order summary">
                 <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1">
@@ -2886,7 +3033,7 @@ const CheckoutPage = () => {
                 </div>
               )}
               {/* One tap now opens this sheet at the same moment the switch to
-                  COD re-triggers the shipping call, so these three figures are
+                  COD re-triggers the shipping call, so these figures are
                   still prepaid-based for a beat. Showing a placeholder beats
                   showing a number the customer would watch change. */}
               <div className="flex items-center justify-between">
@@ -2903,6 +3050,18 @@ const CheckoutPage = () => {
                 ) : (
                   <span className="font-semibold text-gray-800">
                     ₹{Math.ceil(realShippingAmount).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">COD fee</span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : codFee === 0 && freeShippingNow ? (
+                  <span className="font-semibold text-emerald-600">FREE</span>
+                ) : (
+                  <span className="font-semibold text-gray-800">
+                    ₹{codFee.toLocaleString()}
                   </span>
                 )}
               </div>
@@ -2934,15 +3093,12 @@ const CheckoutPage = () => {
             </div>
 
             <button
-              onClick={() => {
-                setShowCodSheet(false);
-                handlePayOnline();
-              }}
+              onClick={handleSwitchToPrepaid}
               disabled={payBusy || !amountsSettled}
               className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 py-2 text-[13px] font-bold text-emerald-700 hover:bg-emerald-100 active:scale-[0.99] transition-all disabled:opacity-50"
             >
-              <i className="fa-solid fa-bolt text-[11px]" /> Save ₹
-              {COD_HANDLING_FEE} and pay online →
+              <i className="fa-solid fa-bolt text-[11px]" />{" "}
+              {codSaving > 0 ? `Save ₹${codSaving.toLocaleString()} - pay online instead →` : "Pay online instead →"}
             </button>
 
             <button

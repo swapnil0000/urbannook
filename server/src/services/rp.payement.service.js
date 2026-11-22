@@ -95,4 +95,28 @@ const razorpayFetchOrderPaymentsService = async (razorpayOrderId) => {
   }
 };
 
-export { razorpayCreateOrderService, razorpayFetchOrderService, razorpayFetchOrderPaymentsService };
+const razorpayClient = () => {
+  if (!env.RP_KEY_ID || !env.RP_SECRET) {
+    throw new InternalServerError("Razorpay credentials not configured");
+  }
+  return new Razorpay({ key_id: env.RP_KEY_ID, key_secret: env.RP_SECRET });
+};
+
+/** Razorpay payment link (COD balance paid online — services/codPrepaidLink.service.js). Throws on failure. */
+const razorpayCreatePaymentLinkService = async (params) => razorpayClient().paymentLink.create(params);
+
+/** A payment link with its payments (`payments[]`). Throws on failure. */
+const razorpayFetchPaymentLinkService = async (linkId) => razorpayClient().paymentLink.fetch(linkId);
+
+/** Refund a captured payment (whole amount unless `amountPaise`). Throws on failure. */
+const razorpayRefundPaymentService = async (paymentId, { amountPaise, notes } = {}) =>
+  razorpayClient().payments.refund(paymentId, { ...(amountPaise ? { amount: amountPaise } : {}), ...(notes ? { notes } : {}) });
+
+export {
+  razorpayCreateOrderService,
+  razorpayFetchOrderService,
+  razorpayFetchOrderPaymentsService,
+  razorpayCreatePaymentLinkService,
+  razorpayFetchPaymentLinkService,
+  razorpayRefundPaymentService,
+};

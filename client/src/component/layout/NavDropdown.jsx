@@ -12,13 +12,17 @@ const CLOSE_DELAY_MS = 120; // lets the pointer cross the gap into the panel
  */
 const NavDropdown = ({ label, to, active, menu }) => {
   const [open, setOpen] = useState(false);
+  // Panel photos mount on first open, not in the server HTML: as the first <img>s
+  // on every page they were what Google picked as a result thumbnail (the GTA 6
+  // stand's /products/<id> showed the Brake Caliper Lamp). Links and labels stay.
+  const [seen, setSeen] = useState(false);
   const timer = useRef(null);
   const { pathname } = useLocation();
 
   useEffect(() => { setOpen(false); }, [pathname]); // eslint-disable-line react-hooks/set-state-in-effect
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const show = () => { clearTimeout(timer.current); setOpen(true); };
+  const show = () => { clearTimeout(timer.current); setOpen(true); setSeen(true); };
   const hide = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS); };
 
   return (
@@ -52,7 +56,7 @@ const NavDropdown = ({ label, to, active, menu }) => {
                     <li key={l.to}>
                       <Link to={l.to} className={`group flex justify-between gap-3 text-[14px] font-medium text-paper/80 hover:text-paper ${l.img ? 'items-center' : 'items-baseline'}`}>
                         <span className="flex items-center gap-3 min-w-0">
-                          {l.img && <img src={l.img} alt="" loading="lazy" className="h-11 w-11 shrink-0 object-cover border border-white/10 bg-white/5 transition-transform duration-300 group-hover:scale-105" />}
+                          {l.img && seen && <img src={l.img} alt="" loading="lazy" className="h-11 w-11 shrink-0 object-cover border border-white/10 bg-white/5 transition-transform duration-300 group-hover:scale-105" />}
                           <span className="group-hover:underline underline-offset-4 decoration-brand">{l.label}</span>
                         </span>
                         {l.count > 1 && <span className="text-[11px] text-paper/40 tabular-nums">{l.count}</span>}
@@ -66,7 +70,7 @@ const NavDropdown = ({ label, to, active, menu }) => {
           {menu.featured && (
             <Link to={menu.featured.to} className="group w-40 shrink-0 self-start">
               <span className="block aspect-square overflow-hidden bg-white/5 border border-white/10">
-                <img src={menu.featured.img} alt={menu.featured.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                {seen && <img src={menu.featured.img} alt={menu.featured.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />}
               </span>
               <span className="mt-2 block text-[12px] font-semibold leading-snug text-paper/80 group-hover:text-paper line-clamp-2">{menu.featured.name}</span>
             </Link>

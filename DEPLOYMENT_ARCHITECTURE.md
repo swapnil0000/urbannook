@@ -23,7 +23,7 @@ The Admin product editor saves optional `pdpDisplay` settings in the existing Pr
 
 The purchase-area presentation is selected by the client-only `premiumPdpPurchaseDesign` boolean in `client/src/config/pdpPurchaseDesign.js`. `true` shows the revised title, rating, price, design selector, and purchase hierarchy with consistent 4px PDP box corners and 1px control borders; `false` restores the preceding presentation. Both paths use the same variant, cart, checkout-intent, WhatsApp, and promotion handlers. The revised offer preview initially shows one real promotion and exposes the remaining offers on request. No product API, price calculation, checkout rule, cache TTL, secret, or SEO data changes with this flag.
 
-The same client-only config also has `floatingPdpPlatformDesign`. `true` places the existing wishlist and share controls over the gallery, hides its numeric image counter, and gives the purchase area a warm raised surface with offers before the purchase buttons. `false` restores the preceding PDP placement and styling. It adds no API request and does not change product, gallery, wishlist, checkout, analytics, cache or SEO data.
+The same client-only config also has `floatingPdpPlatformDesign`. `true` places compact 22px wishlist and share visuals over the gallery with 28×44px touch targets, hides its numeric image counter, and gives the purchase area a warm raised surface with offers before the purchase buttons. `false` restores the preceding PDP placement and styling. It adds no API request and does not change product, gallery, wishlist, checkout, analytics, cache or SEO data.
 
 The PDP type picker displays compact LED/Non-LED labels without visible stock text; unavailable types remain disabled and stock handling on the destination product is unchanged. The design selector exposes scroll arrows on mobile and desktop when more designs lie offscreen. This is client presentation only, with no cache, API, or SEO change.
 
@@ -94,10 +94,9 @@ The product-list and category-details APIs derive sales counts from order
 items for products in the requested result. Only orders in PAID, CONFIRMED, PROCESSING, SHIPPED, or
 DELIVERED status count. It returns all-time and 30-day counts for the existing
 "Most bought"/"Trending" sort signals, plus an exact 7-day unit count per
-product and variant. A product with at least five all-time units can show the
-"Most bought" badge on its two strongest variants, including on category pages.
-Product cards show the exact 7-day count on each product's top two matching
-variants when each has at least five units sold. Ranking uses the current
+product and variant. These counts drive sorting only: product cards show no
+tag or demand pills (no Bestseller/Trending/New/"Most bought" chip and no
+"% OFF" pill on the photo); a card's only photo pill is "Sold out". Ranking uses the current
 filter results, so availability, price, category, and type filters all apply
 together. Counts
 measure units sold, not distinct customers, and exclude free gift lines. These
