@@ -121,9 +121,9 @@ const AllProductsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-4">
-            {displayProducts.map(({ key, p, href }, i) => (
+            {displayProducts.map(({ key, p, href, soldOut }, i) => (
               <RevealCard key={key} index={i}>
-              <UnProductCard p={p} href={href} index={i} listId="all_products" listName="All Products" />
+              <UnProductCard p={p} href={href} index={i} listId="all_products" listName="All Products" showStock outOfStock={soldOut} />
               </RevealCard>
             ))}
           </div>

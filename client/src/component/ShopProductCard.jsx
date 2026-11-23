@@ -12,7 +12,7 @@ const fitCatalogImage = (event) => {
 
 // One presentation for ordinary product and variant listings. All data and
 // navigation still come from each caller's existing source and handlers.
-const ShopProductCard = ({ href, onClick, title, image, secondaryImage, price, mrp }) => {
+const ShopProductCard = ({ href, onClick, title, image, secondaryImage, price, mrp, showStock = false, outOfStock = false }) => {
   const sellingPrice = Number(price || 0);
   const originalPrice = Number(mrp || 0);
   const discounted = sellingPrice > 0 && originalPrice > sellingPrice;
@@ -26,6 +26,10 @@ const ShopProductCard = ({ href, onClick, title, image, secondaryImage, price, m
       </div>
       <div className="shop-product-details flex min-w-0 flex-1 flex-col">
         <h3 title={title} className="shop-product-title line-clamp-2 break-words text-ink">{title}</h3>
+        {showStock && <span className={`shop-product-stock mt-1.5 inline-flex w-fit items-center gap-1.5 border px-1.5 py-0.5 text-[10px] font-semibold leading-tight ${outOfStock ? 'border-hair text-muted' : 'border-save/30 text-save'}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${outOfStock ? 'bg-muted' : 'bg-save'}`} aria-hidden="true" />
+          {outOfStock ? 'Out of stock' : 'In stock'}
+        </span>}
         <div className="shop-product-price mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="shop-product-selling text-ink">{inr(sellingPrice)}</span>
           {discounted && <>

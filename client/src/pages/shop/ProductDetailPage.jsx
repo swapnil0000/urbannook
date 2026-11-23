@@ -15,8 +15,6 @@ import NotifyMeModal from '../../component/NotifyMeModal';
 import ComparisonTable from '../../component/ComparisonTable';
 import ImageCarousel from '../../component/ImageCarousel';
 import CommunityShots from '../../component/CommunityShots';
-import { premiumPdpPurchaseDesign, floatingPdpPlatformDesign } from '../../config/pdpPurchaseDesign';
-import './ProductDetailPage.css';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { useGetPhotoReviewsQuery } from '../../store/api/statsApi';
@@ -60,6 +58,12 @@ const isVariantOutOfStock = (v) =>
   !!v &&
   (v.variantOutOfStock === true ||
     (v.variantQuantity != null && Number(v.variantQuantity) <= 0));
+
+const DetailsToggleIcon = () => (
+  <svg aria-hidden="true" className="shrink-0 text-brand transition-transform duration-300 group-open:rotate-45" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
 
 /* Version picker (e.g. Wooden | LED katana). The server inlines, per variant,
    the other published variants in its variantGroup as `versions`. No type →
@@ -849,7 +853,7 @@ const ProductDetailPage = () => {
                 <details key={i} className="group py-4">
                   <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
                     <span>{f.q}</span>
-                    <span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span>
+                    <DetailsToggleIcon />
                   </summary>
                   <p className="pdp-long-copy text-muted text-sm mt-3 leading-relaxed">{f.a}</p>
                 </details>
@@ -870,7 +874,7 @@ const ProductDetailPage = () => {
           onClick={(event) => { event.preventDefault(); onSelectVariant(variant); }}
           aria-current={selected ? 'true' : undefined}
           title={variant.variantName}
-          className={`pdp-variant-pill ${premiumPdpPurchaseDesign ? 'pdp-purchase-design-option' : 'shrink-0 whitespace-nowrap'} rounded-full border px-3.5 py-2 font-archivo text-[13px] leading-none transition-colors ${selected ? 'border-ink bg-ink font-bold text-paper' : 'border-hair bg-white font-semibold text-ink hover:border-ink'} ${outOfStock ? 'text-muted line-through' : ''}`}>
+          className={`pdp-variant-pill pdp-purchase-design-option rounded-full border px-3.5 py-2 font-archivo text-[13px] leading-none transition-colors ${selected ? 'border-ink bg-ink font-bold text-paper' : 'border-hair bg-white font-semibold text-ink hover:border-ink'} ${outOfStock ? 'text-muted line-through' : ''}`}>
           {shortNames.get(variant.variantName) || variant.variantName}
         </Link>
       );
@@ -879,11 +883,11 @@ const ProductDetailPage = () => {
   const purchaseOffers = <>
     {sections.offers && <SaleDealBox className="mt-4" />}
     <div id="pdp-offers" className="scroll-mt-24" />
-    {sections.offers && <ProductOffers productId={productId} className="mt-3" compact={premiumPdpPurchaseDesign} cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />}
+    {sections.offers && <ProductOffers productId={productId} className="mt-3" compact cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />}
   </>;
 
   return (
-    <div ref={pageRef} className={`pdp-page font-inter bg-paper text-ink min-h-screen overflow-x-clip ${premiumPdpPurchaseDesign ? 'pdp-purchase-design-active' : ''} ${floatingPdpPlatformDesign ? 'pdp-floating-platform-active' : ''}`}>
+    <div ref={pageRef} className="pdp-page pdp-premium-purchase pdp-premium-layout font-inter bg-paper text-ink min-h-screen overflow-x-clip">
       <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" forceNoIndex={previewMode} structuredData={previewMode ? [] : [structuredData, breadcrumbData, ...(sections.faq && seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-3 pb-6 md:py-8">
@@ -894,22 +898,22 @@ const ProductDetailPage = () => {
             : <span className="text-ink">{product.productName}</span>}
         </div>
 
-        <div className={`grid lg:grid-cols-2 gap-2 sm:gap-8 lg:gap-10 ${floatingPdpPlatformDesign ? 'pdp-product-layout' : ''}`}>
+        <div className="pdp-product-layout grid lg:grid-cols-2 gap-2 sm:gap-8 lg:gap-10">
           {/* GALLERY - one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0 relative">
-            <ImageCarousel priority thumbs hideCounter={floatingPdpPlatformDesign} images={galleryImages} alt={(i) => `${imageTitle} - photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
-            {floatingPdpPlatformDesign && <div className="pdp-gallery-actions" aria-label="Product actions">
+            <ImageCarousel priority thumbs hideCounter images={galleryImages} alt={(i) => `${imageTitle} - photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <div className="pdp-gallery-actions" aria-label="Product actions">
               <button onClick={handleShareClick} aria-label="Share this product" className="pdp-gallery-action" type="button">
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
               </button>
               <WishlistButton productId={product.productId} className="pdp-gallery-wishlist" size="lg" />
-            </div>}
+            </div>
           </div>
 
           {/* INFO */}
-          <div className={`min-w-0 ${premiumPdpPurchaseDesign ? 'pdp-purchase-premium' : ''} ${floatingPdpPlatformDesign ? 'pdp-floating-platform' : ''}`}>
+          <div className="min-w-0 pdp-purchase-premium pdp-floating-platform">
             {/* ZONE A - IDENTITY: title + share/heart, then price (left) and the reviews pill (right) */}
-            <div className={`flex items-start justify-between gap-3 ${premiumPdpPurchaseDesign ? 'pdp-purchase-heading' : ''}`}>
+            <div className="pdp-purchase-heading flex items-start justify-between gap-3">
               <div className="min-w-0">
                 {/* No line-clamp - a long name used to get cut off with an
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
@@ -922,14 +926,8 @@ const ProductDetailPage = () => {
                   <p className="pdp-subtitle text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
               </div>
-              {!floatingPdpPlatformDesign && <div className={`shrink-0 pt-1 flex items-center gap-2 ${premiumPdpPurchaseDesign ? 'pdp-purchase-icons' : ''}`}>
-                <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
-                </button>
-                <WishlistButton productId={product.productId} />
-              </div>}
             </div>
-            {premiumPdpPurchaseDesign && sections.reviews && totalReviews > 0 && avgRating > 0 && (
+            {sections.reviews && totalReviews > 0 && avgRating > 0 && (
               <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="pdp-purchase-rating inline-flex items-center gap-1.5 text-left hover:opacity-70 transition-opacity" aria-label={`Read ${totalReviews} product reviews`}>
                 <Stars n={avgRating} className="text-xs" />
                 <span className="text-xs font-semibold text-ink">{Number(avgRating).toFixed(1)}</span>
@@ -948,33 +946,18 @@ const ProductDetailPage = () => {
             )}
             {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            <div className={`mt-3 flex items-start justify-between gap-3 ${premiumPdpPurchaseDesign ? 'pdp-purchase-pricing' : ''}`}>
+            <div className="pdp-purchase-pricing mt-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className={`flex items-center gap-2.5 ${premiumPdpPurchaseDesign ? 'pdp-purchase-price-line' : ''}`}>
+                <div className="pdp-purchase-price-line flex items-center gap-2.5">
                   <span className="pdp-price text-[28px] md:text-[34px] font-bold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
                   {discountPercent > 0 && (
-                    <div className={premiumPdpPurchaseDesign ? 'pdp-purchase-saving' : 'flex flex-col items-start gap-1'}>
-                      {premiumPdpPurchaseDesign ? <>
+                    <div className="pdp-purchase-saving">
                         <span className="pdp-mrp text-sm text-faint line-through tabular-nums leading-none">{inr(maxVariantPrice)}</span>
                         <span className="pdp-discount text-[11px] font-extrabold leading-none text-sale">{discountPercent}% OFF</span>
-                      </> : <>
-                        <span className="pdp-discount text-[11px] font-extrabold leading-none text-sale">{discountPercent}% OFF</span>
-                        <span className="pdp-mrp text-sm text-faint line-through tabular-nums leading-none">{inr(maxVariantPrice)}</span>
-                      </>}
                     </div>
                   )}
                 </div>
                 <SaleTag />
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                {!premiumPdpPurchaseDesign && sections.reviews && totalReviews > 0 && avgRating > 0 && (
-                  <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center gap-1.5 py-1 hover:opacity-70 transition-opacity" aria-label={`Read ${totalReviews} product reviews`}>
-                    <Stars n={avgRating} className="text-xs" />
-                    <span className="text-xs font-bold text-ink">{Number(avgRating).toFixed(1)}</span>
-                    <span className="text-xs text-muted">({totalReviews})</span>
-                  </button>
-                )}
-                {/* paused for now: {discountPercent > 0 && <p className="text-[13px] font-semibold text-save">You save {inr(maxVariantPrice - currentPrice)}</p>} */}
               </div>
             </div>
 
@@ -989,7 +972,7 @@ const ProductDetailPage = () => {
               {/* variants */}
               {sections.variantPicker && availableVariants.length > 0 && (
                 <>
-                  <div className={premiumPdpPurchaseDesign ? 'my-3' : 'my-4'} />
+                  <div className="my-3" />
 
                   {/* Picture swatches with the picked design's name on the label
                       row. Each tile is a real link to that variant's own URL
@@ -1000,14 +983,12 @@ const ProductDetailPage = () => {
                       own piece, so photo tiles labelled "Variant" misled shoppers.
                       Real links to each design's URL; a click swaps in place. */}
                   {activeVariants.length > 1 && (
-                    <div className={premiumPdpPurchaseDesign ? 'pdp-purchase-designs' : ''}>
-                      {premiumPdpPurchaseDesign ? <>
+                    <div className="pdp-purchase-designs">
                         <div className="pdp-purchase-variant-meta">
-                          <span>Choose design</span>
+                          <span>Choose variant</span>
                           <span>Selected: {shortNames.get(selectedVariant) || selectedVariant}</span>
                         </div>
-                        <ScrollRow className="pdp-purchase-options-scroll" fade={floatingPdpPlatformDesign ? 'from-[#faf8f4]' : 'from-paper'} activeKey={selectedVariant}>{variantLinks}</ScrollRow>
-                      </> : <ScrollRow fade="from-paper" activeKey={selectedVariant}>{variantLinks}</ScrollRow>}
+                        <ScrollRow className="pdp-purchase-options-scroll" fade="from-[#faf8f4]" activeKey={selectedVariant}>{variantLinks}</ScrollRow>
                     </div>
                   )}
                 </>
@@ -1030,10 +1011,10 @@ const ProductDetailPage = () => {
                 <span className="text-muted"><i className="fa-solid fa-truck-fast mr-1" aria-hidden="true" />Ships in 24-48 hrs</span>
               </div> */}
 
-              {floatingPdpPlatformDesign && purchaseOffers}
+              {purchaseOffers}
 
               {/* CTA */}
-              <div ref={buyBoxRef} className={`pdp-buy-actions flex items-center gap-3 mt-4 ${premiumPdpPurchaseDesign ? 'pdp-purchase-actions' : ''}`}>
+              <div ref={buyBoxRef} className="pdp-buy-actions pdp-purchase-actions flex items-center gap-3 mt-4">
                 {isOutOfStock ? (
                   <button
                     onClick={() => setShowNotifyModal(true)}
@@ -1043,19 +1024,19 @@ const ProductDetailPage = () => {
                   </button>
                 ) : isInCart ? (
                   <>
-                    <div className={`flex items-center border border-ink rounded-xl h-12 shrink-0 ${premiumPdpPurchaseDesign ? 'pdp-purchase-quantity' : ''}`}>
+                    <div className="pdp-purchase-quantity flex items-center border border-ink rounded-xl h-12 shrink-0">
                       <button onClick={() => handleUpdateQty(currentCartQty - 1)} aria-label={currentCartQty > 1 ? 'Decrease quantity' : 'Remove from cart'} className="w-10 h-full text-lg">−</button>
                       <span className="w-8 text-center font-bold">{currentCartQty}</span>
                       <button onClick={() => handleUpdateQty(currentCartQty + 1)} aria-label="Increase quantity" className="w-10 h-full text-lg">+</button>
                     </div>
-                    <button onClick={handleCheckoutClick} className={`gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi ${premiumPdpPurchaseDesign ? 'pdp-purchase-primary' : ''}`}>{premiumPdpPurchaseDesign ? 'Continue to checkout' : 'View offers & checkout'}</button>
+                    <button onClick={handleCheckoutClick} className="pdp-purchase-primary gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">Continue to checkout</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className={`gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 whitespace-nowrap ${premiumPdpPurchaseDesign ? 'pdp-purchase-secondary' : ''}`}>
+                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="pdp-purchase-secondary gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 whitespace-nowrap">
                       Add to Cart
                     </button>
-                    <button onClick={handleBuyNow} disabled={isAdding} className={`gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap ${premiumPdpPurchaseDesign ? 'pdp-purchase-primary' : ''}`}>
+                    <button onClick={handleBuyNow} disabled={isAdding} className="pdp-purchase-primary gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
                       {isAdding ? 'Please wait…' : 'Buy Now'}
                     </button>
                   </>
@@ -1066,18 +1047,10 @@ const ProductDetailPage = () => {
                   decision happens - hidden unless admin's promotion is on. */}
               {sections.deliveryOffer && !isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
 
-              {/* Legacy purchase order is preserved when the design flag is off. */}
-              {!premiumPdpPurchaseDesign && sections.questions && <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />}
-
-              {/* Offers right under the buy buttons - price and variants stay clean
-                  up top; the offers popup (OffersPopup) announces them on arrival. */}
-              {/* live sale countdown right above the offers it belongs to */}
-              {!floatingPdpPlatformDesign && purchaseOffers}
-
               {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
               {sections.coupons && <CouponOffersSection variant="pdp" />}
 
-              {premiumPdpPurchaseDesign && sections.questions && <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="pdp-purchase-help mt-4" />}
+              {sections.questions && <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="pdp-purchase-help mt-4" />}
 
               {/* Customization - admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the
@@ -1093,7 +1066,7 @@ const ProductDetailPage = () => {
                       }`,
                     )
                   }
-                  className={`mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left ${premiumPdpPurchaseDesign ? 'pdp-customize-card' : ''}`}
+                  className="pdp-customize-card mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm font-bold text-ink">Want it customised?</span>
@@ -1209,20 +1182,20 @@ const ProductDetailPage = () => {
           <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-4 md:mb-5 text-center">{pdpDisplay.headings.details || 'Product details'}</h2>
           <div className="divide-y divide-hair border-y border-hair">
             {sections.details && displayDescription && (
-              <details open className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="pdp-description text-muted mt-2.5 text-sm leading-relaxed">{displayDescription}</p></details>
+              <details open className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<DetailsToggleIcon /></summary><p className="pdp-description text-muted mt-2.5 text-sm leading-relaxed">{displayDescription}</p></details>
             )}
             {sections.specifications && specs.length > 0 && (
-              <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+              <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<DetailsToggleIcon /></summary>
                 <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
               </details>
             )}
             {sections.materialCare && (product.materialAndCare || product.warranty) && (
-              <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Material &amp; Care<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+              <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Material &amp; Care<DetailsToggleIcon /></summary>
                 {product.materialAndCare && <p className="text-muted mt-3 text-sm leading-relaxed">{product.materialAndCare}</p>}
                 {product.warranty && <p className="text-muted mt-2 text-sm leading-relaxed"><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
               </details>
             )}
-            {sections.shippingExchange && <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>}
+            {sections.shippingExchange && <details className="group py-3 md:py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<DetailsToggleIcon /></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>}
           </div>
           {product.disclaimer && <p className="text-xs text-faint mt-4 text-center leading-relaxed">{product.disclaimer}</p>}
         </section>
@@ -1286,7 +1259,7 @@ const ProductDetailPage = () => {
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             data-sticky-buybar="all" // the floating Help button lifts above this bar while it is shown ("all" = desktop too)
-            className={`pdp-sticky-buy fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))] ${premiumPdpPurchaseDesign ? 'pdp-purchase-sticky-premium' : ''}`}
+            className="pdp-sticky-buy pdp-purchase-sticky-premium fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]"
           >
             {/* the thumbnail is the first thing to go once the bar also has to
                 hold a stepper - at 390px there is not room for both */}
@@ -1327,7 +1300,7 @@ const ProductDetailPage = () => {
                     +
                   </button>
                 </div>
-                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">{premiumPdpPurchaseDesign ? 'Checkout' : 'Offers & checkout'}</button>
+                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
               </>
             ) : (
               <>
