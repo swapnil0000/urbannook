@@ -169,7 +169,7 @@ const CategoryPage = () => {
           </div>
         )}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-4">
-          {pageItems.map(({ key, p, href }, i) => (
+          {pageItems.map(({ key, p, href, soldOut }, i) => (
             <RevealCard key={key} index={i}>
               <UnProductCard
                 p={p}
@@ -177,6 +177,8 @@ const CategoryPage = () => {
                 index={i}
                 listId={`category_${category.slug}`}
                 listName={`Category: ${name}`}
+                showStock
+                outOfStock={soldOut}
               />
             </RevealCard>
           ))}

@@ -4,7 +4,7 @@ import ShopProductCard from './ShopProductCard';
 
 // Used by Shop All, category/collection pages, PDP recommendations and blog
 // product links. Each caller keeps its existing href and analytics context.
-const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid', href }) => {
+const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid', href, showStock = false, outOfStock = false }) => {
   const variant = firstVariant(p);
   const track = () => trackSelectItem?.({
     itemId: p.productId,
@@ -24,6 +24,8 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid', href 
     secondaryImage={secondImg(p)}
     price={p?.effectivePrice ?? variant.variantPrice}
     mrp={p?.effectiveMrp ?? variant.variantMrp}
+    showStock={showStock}
+    outOfStock={outOfStock}
   />;
 };
 

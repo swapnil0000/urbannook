@@ -19,6 +19,9 @@ import '@fontsource/anton/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-600.css'
 import './index.css'
+// PDP is server-rendered; load its layout rules with the initial stylesheet so
+// the purchase panel has its final shape before hydration and route chunk load.
+import './pages/shop/ProductDetailPage.css'
 import App, { NewHeader, Footer } from './App.jsx'
 import { preloadPageForPath } from './pages/index.js'
 import { GoogleOAuthProvider } from '@react-oauth/google';
