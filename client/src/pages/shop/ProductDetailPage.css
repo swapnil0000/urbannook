@@ -18,52 +18,52 @@
   background: rgb(var(--gl-paper));
 }
 
-/* The storefront's global square-corner rule uses !important. Keep a single
-   4px surface radius only while the premium PDP flag is enabled. */
-.pdp-page.pdp-purchase-design-active :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .gl-pcard),
-.pdp-page.pdp-purchase-design-active :is(.pdp-gallery-frame, .pdp-gallery-thumb, .pdp-photo-card) {
+/* The storefront's global square-corner rule uses !important. Keep a
+   consistent 4px radius on PDP surfaces. */
+.pdp-page.pdp-premium-purchase :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .gl-pcard),
+.pdp-page.pdp-premium-purchase :is(.pdp-gallery-frame, .pdp-gallery-thumb, .pdp-photo-card) {
   border-radius: 4px !important;
 }
 
-.pdp-page.pdp-purchase-design-active {
+.pdp-page.pdp-premium-purchase {
   --pdp-outline: rgb(var(--gl-hair));
   --pdp-control-shadow: 0 2px 5px rgb(var(--gl-ink) / 0.08);
 }
 
-.pdp-page.pdp-purchase-design-active .pdp-gallery-frame {
+.pdp-page.pdp-premium-purchase .pdp-gallery-frame {
   border-color: var(--pdp-outline);
 }
 
-.pdp-page.pdp-purchase-design-active :is(.pdp-purchase-design-option, .pdp-version-option, .pdp-purchase-actions > button, .pdp-purchase-quantity, .pdp-customize-card) {
+.pdp-page.pdp-premium-purchase :is(.pdp-purchase-design-option, .pdp-version-option, .pdp-purchase-actions > button, .pdp-purchase-quantity, .pdp-customize-card) {
   box-shadow: var(--pdp-control-shadow);
 }
 
-.pdp-page.pdp-purchase-design-active :is(.pdp-purchase-design-option:not([aria-current]), .pdp-version-option:not([aria-pressed='true']), .pdp-purchase-secondary, .pdp-purchase-quantity, .pdp-customize-card) {
+.pdp-page.pdp-premium-purchase :is(.pdp-purchase-design-option:not([aria-current]), .pdp-version-option:not([aria-pressed='true']), .pdp-purchase-secondary, .pdp-purchase-quantity, .pdp-customize-card) {
   border-color: var(--pdp-outline);
 }
 
-.pdp-page.pdp-purchase-design-active .pdp-purchase-primary {
+.pdp-page.pdp-premium-purchase .pdp-purchase-primary {
   border: 1px solid rgb(var(--gl-brand));
 }
 
-.pdp-page.pdp-purchase-design-active section[aria-label='Offers on this product'] {
+.pdp-page.pdp-premium-purchase section[aria-label='Offers on this product'] {
   border-color: var(--pdp-outline);
 }
 
-.pdp-page.pdp-purchase-design-active section[aria-label='Offers on this product'] button[aria-expanded] {
+.pdp-page.pdp-premium-purchase section[aria-label='Offers on this product'] button[aria-expanded] {
   border-color: var(--pdp-outline);
   box-shadow: var(--pdp-control-shadow);
 }
 
-.pdp-page.pdp-purchase-design-active .pdp-version-option > span:first-child {
+.pdp-page.pdp-premium-purchase .pdp-version-option > span:first-child {
   font-weight: 600;
 }
 
-.pdp-page.pdp-purchase-design-active .pdp-version-option {
-  min-width: 72px;
-  min-height: 44px;
-  padding: 6px 12px;
-  font-size: 12.5px;
+.pdp-page.pdp-premium-purchase .pdp-version-option {
+  min-width: 64px;
+  min-height: 36px;
+  padding: 5px 9px;
+  font-size: 11.5px;
 }
 
 /* Typography stays local to the product page. Inter is already loaded for the
@@ -254,13 +254,12 @@
   .pdp-page .gl-pcard h3 { font-size: 14px; }
 }
 
-/* Optional floating purchase platform. This layer is removed completely when
-   floatingPdpPlatformDesign is false. The existing purchase logic is shared. */
-.pdp-page.pdp-floating-platform-active .pdp-product-layout {
+/* PDP gallery actions and floating purchase surface. */
+.pdp-page.pdp-premium-layout .pdp-product-layout {
   align-items: start;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-floating-platform {
+.pdp-page.pdp-premium-layout .pdp-floating-platform {
   min-width: 0;
   padding: 20px;
   border-radius: 4px;
@@ -268,15 +267,15 @@
   box-shadow: 0 3px 10px rgb(20 20 20 / 0.045), 0 18px 38px rgb(20 20 20 / 0.055);
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-body {
+.pdp-page.pdp-premium-layout .pdp-purchase-body {
   background: transparent;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-heading {
+.pdp-page.pdp-premium-layout .pdp-purchase-heading {
   display: block;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-premium.pdp-floating-platform h1 {
+.pdp-page.pdp-premium-layout .pdp-purchase-premium.pdp-floating-platform h1 {
   width: 100%;
   min-height: 0;
   font-size: clamp(25px, 6.6vw, 28px);
@@ -286,15 +285,15 @@
   overflow-wrap: break-word;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-rating {
+.pdp-page.pdp-premium-layout .pdp-purchase-rating {
   margin-top: 8px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-pricing {
+.pdp-page.pdp-premium-layout .pdp-purchase-pricing {
   margin-top: 14px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-actions {
+.pdp-page.pdp-premium-layout .pdp-gallery-actions {
   position: absolute;
   z-index: 20;
   top: 4px;
@@ -304,8 +303,8 @@
   gap: 0;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-action,
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist {
+.pdp-page.pdp-premium-layout .pdp-gallery-action,
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist {
   position: relative;
   display: grid;
   place-items: center;
@@ -320,8 +319,8 @@
   font-size: 10px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-action::before,
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist::before {
+.pdp-page.pdp-premium-layout .pdp-gallery-action::before,
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist::before {
   position: absolute;
   width: 22px;
   height: 22px;
@@ -333,46 +332,46 @@
   backdrop-filter: blur(8px);
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-action svg,
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist i {
+.pdp-page.pdp-premium-layout .pdp-gallery-action svg,
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist i {
   position: relative;
   width: 10px;
   height: 10px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist i {
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist i {
   display: grid;
   place-items: center;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist.bg-red-500 {
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist.bg-red-500 {
   background: transparent;
   color: white;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist.bg-red-500::before {
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist.bg-red-500::before {
   background: rgb(var(--gl-brand));
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-action:focus-visible,
-.pdp-page.pdp-floating-platform-active .pdp-gallery-wishlist:focus-visible {
+.pdp-page.pdp-premium-layout .pdp-gallery-action:focus-visible,
+.pdp-page.pdp-premium-layout .pdp-gallery-wishlist:focus-visible {
   outline: 2px solid rgb(var(--gl-brand));
   outline-offset: 2px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-frame + div button {
+.pdp-page.pdp-premium-layout .pdp-gallery-frame + div button {
   height: 7px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-gallery-frame + div button.w-6 {
+.pdp-page.pdp-premium-layout .pdp-gallery-frame + div button.w-6 {
   width: 18px;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-actions {
+.pdp-page.pdp-premium-layout .pdp-purchase-actions {
   margin-top: 16px;
 }
 
-.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] {
+.pdp-page.pdp-premium-layout section[aria-label='Offers on this product'] {
   padding: 12px 0;
   border: 0;
   border-top: 1px solid rgb(var(--gl-hair));
@@ -382,32 +381,31 @@
   box-shadow: none;
 }
 
-.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] li {
+.pdp-page.pdp-premium-layout section[aria-label='Offers on this product'] li {
   padding: 4px 0;
   background: transparent;
 }
 
-.pdp-page.pdp-floating-platform-active section[aria-label='Offers on this product'] button[aria-expanded] {
+.pdp-page.pdp-premium-layout section[aria-label='Offers on this product'] button[aria-expanded] {
   background: transparent;
   box-shadow: none;
 }
 
-.pdp-page.pdp-floating-platform-active .pdp-purchase-actions .pdp-purchase-secondary {
+.pdp-page.pdp-premium-layout .pdp-purchase-actions .pdp-purchase-secondary {
   background: transparent;
 }
 
 @media (min-width: 768px) {
-  .pdp-page.pdp-floating-platform-active .pdp-floating-platform {
+  .pdp-page.pdp-premium-layout .pdp-floating-platform {
     padding: 28px;
   }
 
-  .pdp-page.pdp-floating-platform-active .pdp-purchase-premium.pdp-floating-platform h1 {
+  .pdp-page.pdp-premium-layout .pdp-purchase-premium.pdp-floating-platform h1 {
     font-size: clamp(30px, 2.5vw, 34px);
   }
 }
 
-/* The purchase redesign is isolated behind premiumPdpPurchaseDesign. Turning
-   that flag off removes this class and restores the previous presentation. */
+/* Premium PDP purchase controls. */
 .pdp-page .pdp-purchase-premium .pdp-purchase-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -440,10 +438,6 @@
 .pdp-page .pdp-purchase-pricing {
   display: block;
   margin-top: 14px;
-}
-
-.pdp-page .pdp-purchase-pricing > div:last-child {
-  display: none;
 }
 
 .pdp-page .pdp-purchase-price-line {
@@ -499,14 +493,15 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-height: 44px;
-  max-width: 180px;
-  padding-inline: 12px;
+  min-height: 32px;
+  max-width: 128px;
+  padding: 5px 8px;
   border-radius: 4px;
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;
-  font-size: 13px;
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  font-size: 11.5px;
   line-height: 1.25;
 }
 
@@ -525,6 +520,11 @@
 .pdp-page .pdp-purchase-options-scroll > div:first-child {
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
+}
+
+.pdp-page .pdp-purchase-options-scroll > div:first-child > div {
+  gap: 6px;
+  padding-inline: 38px;
 }
 
 .pdp-page .pdp-purchase-options-scroll .pdp-purchase-design-option {
@@ -584,11 +584,6 @@
 }
 
 @media (max-width: 767px) {
-  .pdp-page .pdp-purchase-options-scroll .pdp-purchase-design-option {
-    width: calc((100vw - 50px) / 2);
-    max-width: none;
-  }
-
   /* WhatsApp remains in the purchase section; the floating support button
      otherwise covers variant choices and the mobile purchase action. */
   #root:has(.pdp-purchase-premium .pdp-purchase-help) .un-help-fab {
